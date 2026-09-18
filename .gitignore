@@ -1,0 +1,21 @@
+# Secrets -- never commit
+.env
+*.env
+!.env.example
+spike/.spike_token.json
+spike/.spike_created.json
+spike/.spike_image.png
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Local artifacts
+*.log
+uploads/
+.DS_Store

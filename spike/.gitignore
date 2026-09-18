@@ -1,0 +1,5 @@
+.env
+.spike_token.json
+.spike_created.json
+.spike_image.png
+__pycache__/
