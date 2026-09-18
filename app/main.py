@@ -9,12 +9,18 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from sqlalchemy import text
 from starlette.middleware.sessions import SessionMiddleware
 
+from app import auth, onboarding
+from app.auth import current_user, token_is_expiring
 from app.config import get_settings
 from app.database import engine
+from app.models import User
 
 logging.basicConfig(
     level=logging.INFO,
@@ -68,6 +74,25 @@ def healthz() -> dict[str, object]:
     }
 
 
-@app.get("/")
-def index() -> dict[str, str]:
-    return {"app": "PostPilot", "status": "phase 1 skeleton"}
+templates = Jinja2Templates(directory="app/templates")
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+app.include_router(auth.router)
+app.include_router(onboarding.router)
+
+
+@app.get("/", response_class=HTMLResponse)
+def index(
+    request: Request,
+    user: User | None = Depends(current_user),
+    error: str | None = None,
+):
+    return templates.TemplateResponse(
+        request,
+        "home.html",
+        {
+            "user": user,
+            "error": error,
+            "token_expiring": bool(user) and token_is_expiring(user),
+        },
+    )

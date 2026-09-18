@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}PostPilot · Write better LinkedIn posts, faster{% endblock %}
+
+{% block content %}
+{% if not user %}
+
+<section class="hero">
+  <span class="eyebrow"><span class="dot"></span>Built on the official LinkedIn API</span>
+  <h1>A topic in.<br>A post worth reading <span class="accent">out.</span></h1>
+  <p class="lede">
+    Type what you want to talk about. PostPilot writes three drafts in your voice,
+    finds an image, and publishes — now or at a time you pick.
+  </p>
+
+  <div class="cta">
+    <a class="btn btn-primary btn-lg" href="/auth/login">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.35V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z"/></svg>
+      Sign in with LinkedIn
+    </a>
+  </div>
+  <p class="fineprint">Free. No card. Takes about ten seconds.</p>
+
+  {% if error == "declined" %}
+    <div class="notice" style="max-width:420px;margin:24px auto 0;text-align:left">
+      Sign-in was cancelled — nothing was changed.
+    </div>
+  {% endif %}
+
+  <div class="preview">
+    <div class="post-card">
+      <div class="post-head">
+        <div class="avatar" aria-hidden="true">HP</div>
+        <div class="meta">
+          <b>Your name</b>
+          <span>Machine Learning Engineer · now</span>
+        </div>
+      </div>
+      <div class="post-body">
+        <p>Our retrieval pipeline was fast. It was also wrong.</p>
+        <p>Six weeks tuning latency, and the answers still missed. The bottleneck was never speed — it was chunking.</p>
+        <p>Three things that actually moved the needle:</p>
+        <p>→ Split on structure, not character counts<br>
+           → Keep the heading with the chunk<br>
+           → Measure retrieval separately from generation</p>
+        <p>What finally fixed retrieval for you?</p>
+        <p class="tags">#RAG #MachineLearning #MLOps</p>
+      </div>
+      <div class="post-foot">
+        <span>👍 Like</span><span>💬 Comment</span><span>↗ Share</span>
+      </div>
+    </div>
+    <p class="caption">A draft from the topic “what I learned tuning our RAG pipeline”.</p>
+  </div>
+</section>
+
+<section class="steps">
+  <div class="step">
+    <div class="n">1</div>
+    <h3>Give it a topic</h3>
+    <p>One line. Pick a post type — a lesson, a launch, a career update — and a tone.</p>
+  </div>
+  <div class="step">
+    <div class="n">2</div>
+    <h3>Pick a draft</h3>
+    <p>Three versions written for your role and field, each scored for hook and clarity. Edit anything.</p>
+  </div>
+  <div class="step">
+    <div class="n">3</div>
+    <h3>Publish or schedule</h3>
+    <p>Post straight away, or choose a time in your own timezone and let it go out without you.</p>
+  </div>
+</section>
+
+{% else %}
+
+{% if token_expiring %}
+  <div class="notice" style="margin-top:20px">
+    <span aria-hidden="true">⚠</span>
+    <div>Your LinkedIn connection expires soon. <a href="/auth/login">Reconnect</a> to keep scheduled posts working.</div>
+  </div>
+{% endif %}
+
+<div class="narrow" style="margin:28px auto 0">
+  <div class="card">
+    <h2>Welcome back, {{ user.name.split(' ')[0] }}</h2>
+    <p class="sub">
+      {% if user.onboarded_at %}
+        Your profile is set up. Drafting arrives next.
+      {% else %}
+        One step left — <a href="/onboarding">tell us who you are</a> so posts sound like you.
+      {% endif %}
+    </p>
+
+    <ul class="facts">
+      <li><b>{{ 'Business' if user.account_type.value == 'business' else 'Personal' }}</b> account</li>
+      {% if user.role_title %}<li>{{ user.role_title }}</li>{% endif %}
+      {% if user.niche %}<li>{{ user.niche }}</li>{% endif %}
+      <li>Tone <b>{{ user.default_tone.value }}</b></li>
+      <li>{{ user.timezone }}</li>
+    </ul>
+
+    <p class="muted" style="margin-top:22px">
+      <a href="/onboarding">Edit profile</a>
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Coming next</h2>
+    <p class="sub">Composition lands in phase 4 — topic in, three drafts out. Nothing can be published yet.</p>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}

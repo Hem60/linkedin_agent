@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Set up your profile · PostPilot{% endblock %}
+{% block shell_class %}narrow{% endblock %}
+
+{% block content %}
+<div style="margin-top:28px">
+  <div class="card">
+    <h2>Tell us who you are</h2>
+    <p class="sub">Asked once. Every post is written for this context, so it reads like you rather than like a template.</p>
+
+    <form method="post" action="/onboarding">
+      <label>Account type</label>
+      <div class="choice">
+        <label>
+          <input type="radio" name="account_type" value="personal"
+                 {% if user.account_type.value != 'business' %}checked{% endif %}
+                 onchange="document.getElementById('biz').hidden = true">
+          <div>Personal
+            <span>Posts from your own profile</span>
+          </div>
+        </label>
+        <label>
+          <input type="radio" name="account_type" value="business"
+                 {% if user.account_type.value == 'business' %}checked{% endif %}
+                 onchange="document.getElementById('biz').hidden = false">
+          <div>Business
+            <span>Brand-style posts about a product</span>
+          </div>
+        </label>
+      </div>
+
+      <label for="role_title">Your role <span class="hint">— shapes the voice</span></label>
+      <input type="text" id="role_title" name="role_title" maxlength="200"
+             value="{{ user.role_title }}" placeholder="Machine Learning Engineer">
+
+      <label for="niche">What you post about</label>
+      <input type="text" id="niche" name="niche" maxlength="300"
+             value="{{ user.niche }}" placeholder="RAG systems, MLOps, computer vision">
+
+      <label for="default_tone">Default tone</label>
+      <select id="default_tone" name="default_tone">
+        {% for t in tones %}
+        <option value="{{ t }}" {% if user.default_tone.value == t %}selected{% endif %}>{{ t|capitalize }}</option>
+        {% endfor %}
+      </select>
+
+      <label for="timezone">Timezone <span class="hint">— scheduled posts use your local clock</span></label>
+      <input type="text" id="timezone" name="timezone" list="tzlist"
+             value="{{ user.timezone or 'UTC' }}">
+      <datalist id="tzlist">
+        {% for tz in timezones %}<option value="{{ tz }}">{% endfor %}
+      </datalist>
+
+      <div id="biz" {% if user.account_type.value != 'business' %}hidden{% endif %}>
+        <label for="company_name">Company name</label>
+        <input type="text" id="company_name" name="company_name" maxlength="200" value="{{ user.company_name }}">
+
+        <label for="products">What you sell</label>
+        <textarea id="products" name="products" placeholder="Industrial ball valves, gate valves, actuators">{{ user.products }}</textarea>
+
+        <label for="target_markets">Target markets <span class="hint">— countries or regions</span></label>
+        <textarea id="target_markets" name="target_markets" placeholder="UAE, Germany, Southeast Asia">{{ user.target_markets }}</textarea>
+
+        <label for="buyer_types">Buyer types <span class="hint">— who you want to reach</span></label>
+        <textarea id="buyer_types" name="buyer_types" placeholder="Importers, distributors, EPC contractors">{{ user.buyer_types }}</textarea>
+      </div>
+
+      <div style="margin-top:28px">
+        <button type="submit" class="btn btn-primary">Save and continue</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

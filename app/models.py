@@ -137,6 +137,10 @@ class User(Base):
     )
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="UTC")
 
+    # Set when the user completes onboarding. Explicit, rather than inferring
+    # "is set up" from whether role_title happens to be non-empty.
+    onboarded_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
+
     # F4: soft delete, so a deletion request can be honoured without orphaning rows.
     deleted_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
 
@@ -216,6 +220,15 @@ class Post(Base):
         Index("ix_posts_due", "status", "scheduled_at"),
         # Every user-facing listing.
         Index("ix_posts_user_created", "user_id", "created_at"),
+        # Duplicate-topic warning (F13). Declared here, not just created in the
+        # migration: an index Alembic cannot see in the metadata is an index
+        # every future --autogenerate will try to drop.
+        Index(
+            "ix_posts_topic_trgm",
+            "topic",
+            postgresql_using="gin",
+            postgresql_ops={"topic": "gin_trgm_ops"},
+        ),
         # A published post must record which LinkedIn post it became.
         CheckConstraint(
             "status <> 'posted' OR linkedin_post_id IS NOT NULL",

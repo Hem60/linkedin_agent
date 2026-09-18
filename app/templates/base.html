@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}PostPilot{% endblock %}</title>
+<meta name="description" content="Turn a topic into a professional LinkedIn post. Three drafts, written for your role, published now or on a schedule.">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230a66c2'/><path d='M7 17.5 25 8l-6.5 17-3.2-6.3z' fill='white'/></svg>">
+</head>
+<body>
+<div class="shell {% block shell_class %}{% endblock %}">
+
+  <div class="topbar">
+    <a class="brand" href="/" style="color:inherit">
+      <span class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 13 22 3l-7.2 19-3.6-7.1z"/></svg>
+      </span>
+      PostPilot
+    </a>
+    {% if user %}
+    <div class="whoami">
+      <span class="name">{{ user.name }}</span>
+      <a href="/auth/logout">Sign out</a>
+    </div>
+    {% endif %}
+  </div>
+
+  {% block content %}{% endblock %}
+
+  <footer>
+    Posts are never published without your approval.
+  </footer>
+</div>
+</body>
+</html>
