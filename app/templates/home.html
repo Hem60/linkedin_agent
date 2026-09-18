@@ -25,35 +25,47 @@
       Sign-in was cancelled — nothing was changed.
     </div>
   {% endif %}
-
-  <div class="preview">
-    <div class="post-card">
-      <div class="post-head">
-        <div class="avatar" aria-hidden="true">HP</div>
-        <div class="meta">
-          <b>Your name</b>
-          <span>Machine Learning Engineer · now</span>
-        </div>
-      </div>
-      <div class="post-body">
-        <p>Our retrieval pipeline was fast. It was also wrong.</p>
-        <p>Six weeks tuning latency, and the answers still missed. The bottleneck was never speed — it was chunking.</p>
-        <p>Three things that actually moved the needle:</p>
-        <p>→ Split on structure, not character counts<br>
-           → Keep the heading with the chunk<br>
-           → Measure retrieval separately from generation</p>
-        <p>What finally fixed retrieval for you?</p>
-        <p class="tags">#RAG #MachineLearning #MLOps</p>
-      </div>
-      <div class="post-foot">
-        <span>👍 Like</span><span>💬 Comment</span><span>↗ Share</span>
-      </div>
-    </div>
-    <p class="caption">A draft from the topic “what I learned tuning our RAG pipeline”.</p>
-  </div>
 </section>
 
-<section class="steps">
+<!-- topic in, post out -->
+<div class="demo">
+  <div class="panel">
+    <div class="panel-head"><span class="dotrow"><i></i><i></i><i></i></span> You write</div>
+    <div class="topic-body">
+      <p class="topic-label">Topic</p>
+      <div class="topic-field"><span id="typed"></span><span class="caret"></span></div>
+      <div class="chips" id="chips">
+        <span class="chip" data-chip="type">Learning</span>
+        <span class="chip" data-chip="tone">Storytelling</span>
+        <span class="chip" data-chip="tags">3 hashtags</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><span class="dotrow"><i></i><i></i><i></i></span> PostPilot writes</div>
+    <div class="post-head">
+      <div class="avatar" aria-hidden="true">HP</div>
+      <div class="meta"><b>Your name</b><span>Machine Learning Engineer · now</span></div>
+    </div>
+    <div class="post-body" id="post"></div>
+    <div class="post-foot">
+      <span>👍 Like</span><span>💬 Comment</span><span>↗ Share</span>
+      <span class="score">Hook <b id="score">9</b>/10</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-head reveal">
+  <h2>Three steps, about a minute</h2>
+  <p>You stay in control at every one of them.</p>
+</div>
+<section class="steps reveal">
   <div class="step">
     <div class="n">1</div>
     <h3>Give it a topic</h3>
@@ -70,6 +82,146 @@
     <p>Post straight away, or choose a time in your own timezone and let it go out without you.</p>
   </div>
 </section>
+
+<div class="section-head reveal">
+  <h2>Eight kinds of post</h2>
+  <p>Each has its own structure, hook style and hashtag mix — not one template with the words swapped.</p>
+</div>
+<section class="typegrid reveal">
+  <span>Learning</span><span>Achievement</span><span>Project launch</span><span>Tips &amp; how-to</span>
+  <span>Industry insight</span><span>Career update</span><span>Event recap</span><span>Brand post</span>
+</section>
+
+<div class="section-head reveal">
+  <h2>What we ask for, and what we don't</h2>
+  <p>Posts go out under your real name, so the boundaries matter.</p>
+</div>
+<section class="trust reveal">
+  <div>
+    <h3><span class="tick">✓</span> You approve every post</h3>
+    <p>Nothing is published until you've read the draft and pressed the button. There is no autopilot.</p>
+  </div>
+  <div>
+    <h3><span class="tick">✓</span> Only the permission to post</h3>
+    <p>We ask for your name, your email and the ability to share on your behalf. Nothing else.</p>
+  </div>
+  <div>
+    <h3><span class="tick">✓</span> Leave whenever</h3>
+    <p>Disconnect LinkedIn and delete your account and every post from one page.</p>
+  </div>
+</section>
+
+<script>
+(function () {
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var EXAMPLES = [
+    {
+      topic: "what I learned tuning our RAG pipeline",
+      type: "Learning", tone: "Storytelling", score: 9,
+      html: '<p class="lead">Our retrieval pipeline was fast. It was also wrong.</p>' +
+            '<p>Six weeks tuning latency, and the answers still missed. The bottleneck was never speed — it was chunking.</p>' +
+            '<p>Three things that actually moved the needle:</p>' +
+            '<p>→ Split on structure, not character counts<br>→ Keep the heading with the chunk<br>→ Measure retrieval separately from generation</p>' +
+            '<p>What finally fixed retrieval for you?</p>' +
+            '<p class="tags">#RAG #MachineLearning #MLOps</p>'
+    },
+    {
+      topic: "we shipped our first customer integration",
+      type: "Project launch", tone: "Direct", score: 8,
+      html: '<p class="lead">Six weeks ago this was a diagram on a whiteboard.</p>' +
+            '<p>Today it moves real orders for a real customer, end to end, without anyone copying a spreadsheet.</p>' +
+            '<p>What it took: a webhook listener, an idempotency key, and far more error handling than the happy path.</p>' +
+            '<p>The unglamorous part is what made it trustworthy.</p>' +
+            '<p>What is the least glamorous thing you shipped that mattered most?</p>' +
+            '<p class="tags">#BuildInPublic #Engineering #Integrations</p>'
+    },
+    {
+      topic: "why most ML demos never reach production",
+      type: "Industry insight", tone: "Professional", score: 9,
+      html: '<p class="lead">A demo proves the model can work. Production proves it can keep working.</p>' +
+            '<p>The gap is rarely accuracy. It is the things a notebook never has to answer for.</p>' +
+            '<p>→ What happens when the input is malformed?<br>→ Who gets paged at 2am?<br>→ How do you know it degraded?</p>' +
+            '<p>Teams that ship start asking those on day one, not after the demo lands.</p>' +
+            '<p>Where does your team draw that line?</p>' +
+            '<p class="tags">#MachineLearning #MLOps #DataScience</p>'
+    }
+  ];
+
+  var typed = document.getElementById('typed');
+  var post  = document.getElementById('post');
+  var score = document.getElementById('score');
+  var chips = document.querySelectorAll('#chips .chip');
+  if (!typed || !post) return;
+
+  function render(ex) {
+    post.innerHTML = ex.html;
+    score.textContent = ex.score;
+    chips[0].textContent = ex.type;
+    chips[1].textContent = ex.tone;
+  }
+
+  if (reduce) {                    // no animation: show the first example, done
+    typed.textContent = EXAMPLES[0].topic;
+    render(EXAMPLES[0]);
+    chips.forEach(function (c) { c.classList.add('on'); });
+    return;
+  }
+
+  // Strictly sequential: every step starts when the previous one finishes.
+  // Scheduling the next cycle on a fixed timer races the typing animation --
+  // the two drift apart and eventually run two loops at once.
+  var i = 0;
+
+  function type(text, done) {
+    var n = 0;
+    (function step() {
+      if (n > text.length) return done();
+      typed.textContent = text.slice(0, n++);
+      setTimeout(step, 34);
+    })();
+  }
+
+  var SKELETON =
+    '<div class="writing-label"><i></i><i></i><i></i>Writing your draft…</div>' +
+    '<span class="sk" style="width:82%"></span>' +
+    '<span class="sk" style="width:96%"></span>' +
+    '<span class="sk" style="width:71%"></span>' +
+    '<span class="sk" style="width:90%"></span>' +
+    '<span class="sk" style="width:58%"></span>' +
+    '<span class="sk" style="width:44%"></span>';
+
+  function cycle() {
+    var ex = EXAMPLES[i];
+    post.classList.add('swapping');
+    post.innerHTML = SKELETON;
+    score.textContent = '–';
+    chips.forEach(function (c) { c.classList.remove('on'); });
+    typed.textContent = '';
+
+    type(ex.topic, function () {
+      chips.forEach(function (c, k) { setTimeout(function () { c.classList.add('on'); }, 150 * k); });
+      setTimeout(function () {
+        render(ex);
+        post.classList.remove('swapping');
+        setTimeout(function () { i = (i + 1) % EXAMPLES.length; cycle(); }, 4600);
+      }, 520);
+    });
+  }
+
+  // Start on the first example fully rendered, so the page never opens mid-fade.
+  render(EXAMPLES[0]);
+  typed.textContent = EXAMPLES[0].topic;
+  chips.forEach(function (c) { c.classList.add('on'); });
+  setTimeout(function () { i = 1; cycle(); }, 3600);
+
+  // reveal sections as they come into view
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { rootMargin: '0px 0px -12% 0px' });
+  document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+})();
+</script>
 
 {% else %}
 
@@ -99,9 +251,7 @@
       <li>{{ user.timezone }}</li>
     </ul>
 
-    <p class="muted" style="margin-top:22px">
-      <a href="/onboarding">Edit profile</a>
-    </p>
+    <p class="muted" style="margin-top:22px"><a href="/onboarding">Edit profile</a></p>
   </div>
 
   <div class="card">
