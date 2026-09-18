@@ -34,8 +34,12 @@ class Settings(BaseSettings):
 
     # --- Models -----------------------------------------------------------
     gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.6-flash"
+    gemini_fallback_model: str = "gemini-3.5-flash-lite"
     groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
     gemini_cooldown_minutes: int = 30
+    model_timeout_seconds: int = 45
 
     # --- Photos and storage -----------------------------------------------
     pexels_api_key: str = ""
