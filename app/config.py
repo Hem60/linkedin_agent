@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.6-flash"
     gemini_fallback_model: str = "gemini-3.5-flash-lite"
     groq_api_key: str = ""
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-120b"
     gemini_cooldown_minutes: int = 30
     model_timeout_seconds: int = 45
 

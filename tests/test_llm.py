@@ -194,7 +194,36 @@ def test_other_errors_are_not_transient(message):
     assert not llm._is_transient(Exception(message))
 
 
-def test_an_overloaded_model_steps_down_to_the_lighter_one(monkeypatch):
+def _fails(message: str):
+    """A model call that always raises -- clearer than a throwing lambda."""
+    def call(prompt, model):
+        raise RuntimeError(message)
+    return call
+
+
+class FakeSettings:
+    gemini_model = "primary"
+    gemini_fallback_model = "lite"
+    groq_model = "groq-model"
+    groq_api_key = "key"
+    gemini_cooldown_minutes = 30
+
+
+@pytest.fixture(autouse=True)
+def _no_cooldown():
+    """Cooldown is module state; a test must not leak it into the next one."""
+    llm.clear_gemini_cooldown()
+    yield
+    llm.clear_gemini_cooldown()
+
+
+@pytest.fixture
+def fake_settings(monkeypatch):
+    monkeypatch.setattr(llm, "get_settings", lambda: FakeSettings())
+    return FakeSettings()
+
+
+def test_an_overloaded_model_steps_down_to_the_lighter_one(fake_settings, monkeypatch):
     tried = []
 
     def fake(prompt, model):
@@ -204,16 +233,14 @@ def test_an_overloaded_model_steps_down_to_the_lighter_one(monkeypatch):
         return _payload()
 
     monkeypatch.setattr(llm, "_gemini", fake)
-    monkeypatch.setattr(llm, "get_settings", lambda: type(
-        "S", (), {"gemini_model": "primary", "gemini_fallback_model": "lite"})())
-    text, model = llm._call_model("prompt")
+    _, model = llm._call_model("prompt")
     assert tried == ["primary", "lite"]
     assert model is llm.ModelUsed.gemini
 
 
-def test_a_permanent_error_does_not_step_down(monkeypatch):
-    """A retired model is not a capacity problem; burning the fallback on it
-    just wastes a request."""
+def test_a_permanent_error_does_not_step_down(fake_settings, monkeypatch):
+    """A retired model is not a capacity problem; burning the lighter model on
+    it just wastes a request. It still falls through to Groq."""
     tried = []
 
     def fake(prompt, model):
@@ -221,11 +248,105 @@ def test_a_permanent_error_does_not_step_down(monkeypatch):
         raise RuntimeError("404 NOT_FOUND no longer available")
 
     monkeypatch.setattr(llm, "_gemini", fake)
-    monkeypatch.setattr(llm, "get_settings", lambda: type(
-        "S", (), {"gemini_model": "primary", "gemini_fallback_model": "lite"})())
-    with pytest.raises(RuntimeError):
-        llm._call_model("prompt")
+    monkeypatch.setattr(llm, "_groq", lambda p, m: _payload())
+    _, model = llm._call_model("prompt")
     assert tried == ["primary"]
+    assert model is llm.ModelUsed.groq
+
+
+# ---------------------------------------------------------------------------
+# Groq fallback -- plan.md section 8
+# ---------------------------------------------------------------------------
+
+def test_gemini_is_used_when_it_works(fake_settings, monkeypatch):
+    monkeypatch.setattr(llm, "_gemini", lambda p, m: _payload())
+    monkeypatch.setattr(llm, "_groq", lambda p, m: pytest.fail("groq must not be called"))
+    _, model = llm._call_model("prompt")
+    assert model is llm.ModelUsed.gemini
+
+
+def test_groq_takes_over_when_every_gemini_model_fails(fake_settings, monkeypatch):
+    """Phase 5's acceptance test: force Gemini to fail."""
+    def boom(prompt, model):
+        raise RuntimeError("503 UNAVAILABLE high demand")
+
+    monkeypatch.setattr(llm, "_gemini", boom)
+    monkeypatch.setattr(llm, "_groq", lambda p, m: _payload())
+    text, model = llm._call_model("prompt")
+    assert model is llm.ModelUsed.groq
+    assert len(llm.parse_drafts(text)) == 3
+
+
+def test_groq_gets_the_identical_prompt(fake_settings, monkeypatch):
+    """Style must not change when the provider does."""
+    seen: list[str] = []
+
+    def fake_groq(prompt, model):
+        seen.append(prompt)
+        return _payload()
+
+    monkeypatch.setattr(llm, "_gemini", _fails("503 UNAVAILABLE"))
+    monkeypatch.setattr(llm, "_groq", fake_groq)
+    llm._call_model("THE PROMPT")
+    assert seen == ["THE PROMPT"]
+
+
+def test_a_quota_error_starts_the_cooldown(fake_settings, monkeypatch):
+    monkeypatch.setattr(llm, "_gemini", _fails("429 RESOURCE_EXHAUSTED quota exceeded"))
+    monkeypatch.setattr(llm, "_groq", lambda p, m: _payload())
+    assert not llm.gemini_in_cooldown()
+    llm._call_model("prompt")
+    assert llm.gemini_in_cooldown()
+
+
+def test_a_capacity_error_does_not_start_the_cooldown(fake_settings, monkeypatch):
+    """Being busy for a moment is not the same as being out of allowance."""
+    monkeypatch.setattr(llm, "_gemini", _fails("503 UNAVAILABLE"))
+    monkeypatch.setattr(llm, "_groq", lambda p, m: _payload())
+    llm._call_model("prompt")
+    assert not llm.gemini_in_cooldown()
+
+
+def test_during_cooldown_gemini_is_not_called_at_all(fake_settings, monkeypatch):
+    """The point of the cooldown is to stop collecting 429s on every request."""
+    monkeypatch.setattr(llm, "_gemini", lambda p, m: pytest.fail("gemini called during cooldown"))
+    monkeypatch.setattr(llm, "_groq", lambda p, m: _payload())
+    llm.start_gemini_cooldown(minutes=30)
+    _, model = llm._call_model("prompt")
+    assert model is llm.ModelUsed.groq
+
+
+def test_cooldown_expires_and_gemini_is_tried_again(fake_settings, monkeypatch):
+    monkeypatch.setattr(llm, "_gemini", lambda p, m: _payload())
+    monkeypatch.setattr(llm, "_groq", lambda p, m: pytest.fail("cooldown should have expired"))
+    llm.start_gemini_cooldown(minutes=-1)     # already in the past
+    _, model = llm._call_model("prompt")
+    assert model is llm.ModelUsed.gemini
+
+
+def test_if_groq_also_fails_during_cooldown_gemini_is_tried_anyway(fake_settings, monkeypatch):
+    """A stale cooldown is a worse reason to fail than a possibly-recovered quota."""
+    monkeypatch.setattr(llm, "_gemini", lambda p, m: _payload())
+    monkeypatch.setattr(llm, "_groq", _fails("groq down"))
+    llm.start_gemini_cooldown(minutes=30)
+    _, model = llm._call_model("prompt")
+    assert model is llm.ModelUsed.gemini
+    assert not llm.gemini_in_cooldown(), "the stale cooldown should have been cleared"
+
+
+def test_both_providers_failing_raises(fake_settings, monkeypatch):
+    monkeypatch.setattr(llm, "_gemini", _fails("503"))
+    monkeypatch.setattr(llm, "_groq", _fails("groq down"))
+    with pytest.raises(llm.GenerationError):
+        llm.generate(_user(), "topic", PostCategory.learning, Tone.direct)
+
+
+def test_the_model_that_answered_is_recorded(fake_settings, monkeypatch):
+    """post.model_used exists so analytics can tell the two apart."""
+    monkeypatch.setattr(llm, "_gemini", _fails("503"))
+    monkeypatch.setattr(llm, "_groq", lambda p, m: _payload())
+    g = llm.generate(_user(), "topic", PostCategory.learning, Tone.direct)
+    assert g.model_used is llm.ModelUsed.groq
 
 
 # ---------------------------------------------------------------------------

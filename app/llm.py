@@ -1,15 +1,25 @@
 """Draft generation -- plan.md sections 7 and 8.
 
-Phase 4 is Gemini plus the JSON contract and its validation. Groq fallback
-arrives in phase 5; the seam it will plug into is `_call_model`.
+Gemini writes; Groq takes over when it cannot. Both receive the identical
+prompt and the identical JSON contract, so a fallback draft reads like a
+primary one rather than announcing the switch.
 
 Budget: one request per post. Scores come back inside the same response rather
 than from a second scoring call, which is what makes a shared free tier viable
 for more than a handful of users.
+
+The failure ladder, cheapest recovery first:
+
+    gemini primary  --busy-->  gemini lighter  --still failing-->  groq
+                    --quota->  start cooldown, go straight to groq
+
+A quota error means the day's allowance is gone, so Gemini is skipped entirely
+for a while. Being momentarily busy is different and does not start a cooldown.
 """
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import logging
 import re
@@ -143,14 +153,57 @@ def problems(drafts: list[Draft], tag_range: tuple[int, int]) -> list[str]:
 # Gemini
 # ---------------------------------------------------------------------------
 
-# 503 "high demand" and 504 are capacity problems, not prompt problems. Retrying
-# the same model immediately is the least useful thing to do; a lighter model
-# usually has headroom when the flagship does not.
-TRANSIENT = ("503", "504", "UNAVAILABLE", "DEADLINE_EXCEEDED", "RESOURCE_EXHAUSTED", "429")
+# Two different failures that both look like "it didn't work":
+#
+#   capacity -- 503/504. The model is busy right now. A lighter model usually
+#               has headroom, and the flagship will be fine again shortly.
+#   quota    -- 429/RESOURCE_EXHAUSTED. We have spent the day's free allowance.
+#               Stepping down models does not help; the limit is on the key.
+#               This is what starts the cooldown.
+CAPACITY = ("503", "504", "UNAVAILABLE", "DEADLINE_EXCEEDED")
+QUOTA = ("429", "RESOURCE_EXHAUSTED", "quota", "rate limit", "rate_limit")
+
+
+def _is_capacity(exc: Exception) -> bool:
+    return any(m in str(exc) for m in CAPACITY)
+
+
+def _is_quota(exc: Exception) -> bool:
+    text = str(exc)
+    return any(m.lower() in text.lower() for m in QUOTA)
 
 
 def _is_transient(exc: Exception) -> bool:
-    return any(marker in str(exc) for marker in TRANSIENT)
+    return _is_capacity(exc) or _is_quota(exc)
+
+
+# ---------------------------------------------------------------------------
+# Gemini cooldown
+# ---------------------------------------------------------------------------
+#
+# After a quota error, Gemini is skipped entirely for a while rather than being
+# retried on every request just to collect another 429. Process-local state: a
+# second worker keeps its own clock and will hit one 429 of its own before
+# settling. That is acceptable for the cost of avoiding a shared store, and is
+# the reason the window is minutes rather than seconds.
+
+_cooldown_until: dt.datetime | None = None
+
+
+def gemini_in_cooldown() -> bool:
+    return _cooldown_until is not None and dt.datetime.now(dt.timezone.utc) < _cooldown_until
+
+
+def start_gemini_cooldown(minutes: int | None = None) -> None:
+    global _cooldown_until
+    mins = minutes if minutes is not None else get_settings().gemini_cooldown_minutes
+    _cooldown_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=mins)
+    log.warning("gemini quota reached; using groq for %d minutes", mins)
+
+
+def clear_gemini_cooldown() -> None:
+    global _cooldown_until
+    _cooldown_until = None
 
 
 def _gemini(prompt: str, model: str) -> str:
@@ -182,26 +235,71 @@ def _gemini(prompt: str, model: str) -> str:
     return resp.text or ""
 
 
-def _call_model(prompt: str) -> tuple[str, ModelUsed]:
-    """Ask Gemini, stepping down to a lighter model if the first is overloaded.
+def _groq(prompt: str, model: str) -> str:
+    from groq import Groq
 
-    This is the seam phase 5 extends with Groq: when every Gemini model is
-    unavailable, the provider changes rather than the model.
-    """
+    s = get_settings()
+    s.require("groq_api_key")
+    client = Groq(api_key=s.groq_api_key, timeout=float(s.model_timeout_seconds), max_retries=0)
+    resp = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        response_format={"type": "json_object"},
+        temperature=0.9,
+        max_tokens=4096,
+    )
+    return resp.choices[0].message.content or ""
+
+
+def _try_gemini(prompt: str) -> str:
+    """Gemini, stepping down to a lighter model when the first is merely busy."""
     s = get_settings()
     models = [m for m in (s.gemini_model, s.gemini_fallback_model) if m]
-    last: Exception | None = None
+    if not models:
+        raise RuntimeError("no gemini model configured")
 
+    last: Exception | None = None
     for i, model in enumerate(models):
         try:
-            return _gemini(prompt, model), ModelUsed.gemini
+            return _gemini(prompt, model)
         except Exception as exc:
             last = exc
-            if not _is_transient(exc) or i == len(models) - 1:
+            if _is_quota(exc):
+                start_gemini_cooldown()
                 raise
-            log.info("gemini model %s unavailable, stepping down: %s", model, str(exc)[:120])
+            if not _is_capacity(exc) or i == len(models) - 1:
+                raise
+            log.info("gemini %s is busy, stepping down: %s", model, str(exc)[:120])
+    raise last  # unreachable, but keeps the type checker honest
 
-    raise last if last else RuntimeError("no gemini model configured")
+
+def _call_model(prompt: str) -> tuple[str, ModelUsed]:
+    """Gemini first, Groq second -- plan.md section 8.
+
+    The same prompt and the same JSON contract go to both, so a fallback draft
+    reads like a Gemini one rather than announcing itself.
+    """
+    s = get_settings()
+    skip_gemini = gemini_in_cooldown()
+
+    if not skip_gemini:
+        try:
+            return _try_gemini(prompt), ModelUsed.gemini
+        except Exception as exc:
+            if not s.groq_api_key:
+                raise
+            log.info("falling back to groq: %s", str(exc)[:160])
+
+    try:
+        return _groq(prompt, s.groq_model), ModelUsed.groq
+    except Exception as exc:
+        if not skip_gemini:
+            raise
+        # The cooldown told us to skip Gemini, but Groq is down too. A stale
+        # cooldown is a worse reason to fail than a possibly-recovered quota.
+        log.info("groq failed during gemini cooldown, trying gemini anyway: %s", str(exc)[:120])
+        clear_gemini_cooldown()
+        return _try_gemini(prompt), ModelUsed.gemini
 
 
 # ---------------------------------------------------------------------------
