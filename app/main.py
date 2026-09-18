@@ -7,20 +7,23 @@ you nothing you didn't already know.
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import text
+from sqlalchemy import func, select, text
+from sqlalchemy.orm import Session
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
 from app import auth, onboarding
 from app.auth import current_user, token_is_expiring
 from app.config import get_settings
-from app.database import engine
-from app.models import User
+from app.database import engine, get_db
+from app.models import Post, User
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,6 +54,49 @@ app.add_middleware(
     https_only=not settings.app_url.startswith("http://localhost"),
     same_site="lax",           # must survive the LinkedIn OAuth redirect back
 )
+
+
+ERROR_COPY = {
+    400: ("That didn't go through", "The request couldn't be verified. Starting again usually fixes it."),
+    401: ("You need to sign in", "Connect your LinkedIn account to continue."),
+    403: ("Not allowed", "You don't have access to that."),
+    404: ("Nothing here", "That page doesn't exist — or it moved."),
+    500: ("Something broke on our side", "It's been logged. Try again in a moment."),
+    502: ("LinkedIn didn't answer", "That's on their end, not yours. Try again shortly."),
+}
+
+
+def _render_error(request: Request, status: int, detail: str | None = None):
+    heading, message = ERROR_COPY.get(
+        status, ("Something went wrong", "An unexpected error occurred.")
+    )
+    return templates.TemplateResponse(
+        request,
+        "error.html",
+        {"status": status, "heading": heading, "message": detail or message, "user": None},
+        status_code=status,
+    )
+
+
+# Starlette's stock reason phrases. Ours read better, so these never reach a user.
+GENERIC_DETAILS = {
+    "Not Found", "Unauthorized", "Forbidden", "Bad Request",
+    "Internal Server Error", "Bad Gateway", "Method Not Allowed",
+}
+
+
+@app.exception_handler(StarletteHTTPException)
+def http_error(request: Request, exc: StarletteHTTPException):
+    """Render errors as pages. A raw JSON body in the browser reads as broken,
+    and this app is server-rendered -- there is no API client to serve.
+
+    A hand-written detail (\"Sign-in could not be verified\") is worth showing;
+    a framework reason phrase (\"Not Found\") is not.
+    """
+    detail = exc.detail if isinstance(exc.detail, str) else None
+    if detail in GENERIC_DETAILS or exc.status_code >= 500:
+        detail = None
+    return _render_error(request, exc.status_code, detail)
 
 
 @app.get("/healthz")
@@ -85,14 +131,32 @@ app.include_router(onboarding.router)
 def index(
     request: Request,
     user: User | None = Depends(current_user),
+    db: Session = Depends(get_db),
     error: str | None = None,
 ):
+    counts = {"draft": 0, "scheduled": 0, "posted": 0}
+    days_left = None
+    if user:
+        rows = db.execute(
+            select(Post.status, func.count())
+            .where(Post.user_id == user.id)
+            .group_by(Post.status)
+        ).all()
+        for status, n in rows:
+            key = status.value if hasattr(status, "value") else str(status)
+            if key in counts:
+                counts[key] = n
+        if user.token_expires_at:
+            days_left = (user.token_expires_at - dt.datetime.now(dt.timezone.utc)).days
+
     return templates.TemplateResponse(
         request,
         "home.html",
         {
             "user": user,
             "error": error,
+            "counts": counts,
+            "days_left": days_left,
             "token_expiring": bool(user) and token_is_expiring(user),
         },
     )

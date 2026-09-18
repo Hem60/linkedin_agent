@@ -28,7 +28,7 @@
 </section>
 
 <!-- topic in, post out -->
-<div class="demo">
+<div class="demo" aria-hidden="true">
   <div class="panel">
     <div class="panel-head"><span class="dotrow"><i></i><i></i><i></i></span> You write</div>
     <div class="topic-body">
@@ -55,7 +55,7 @@
     </div>
     <div class="post-body" id="post"></div>
     <div class="post-foot">
-      <span>👍 Like</span><span>💬 Comment</span><span>↗ Share</span>
+      <span aria-hidden="true">👍 Like</span><span aria-hidden="true">💬 Comment</span><span aria-hidden="true">↗ Share</span>
       <span class="score">Hook <b id="score">9</b>/10</span>
     </div>
   </div>
@@ -228,35 +228,86 @@
 {% if token_expiring %}
   <div class="notice" style="margin-top:20px">
     <span aria-hidden="true">⚠</span>
-    <div>Your LinkedIn connection expires soon. <a href="/auth/login">Reconnect</a> to keep scheduled posts working.</div>
+    <div>
+      Your LinkedIn connection {% if days_left is not none and days_left > 0 %}expires in {{ days_left }} days{% else %}has expired{% endif %}.
+      <a href="/auth/login">Reconnect</a> to keep scheduled posts working.
+    </div>
   </div>
 {% endif %}
 
-<div class="narrow" style="margin:28px auto 0">
-  <div class="card">
-    <h2>Welcome back, {{ user.name.split(' ')[0] }}</h2>
-    <p class="sub">
+<div class="narrow" style="margin:0 auto">
+  <div class="dash-head">
+    <h1>Welcome back, {{ user.name.split(' ')[0] }}</h1>
+    <p>
       {% if user.onboarded_at %}
-        Your profile is set up. Drafting arrives next.
+        Everything's set up. Pick a topic when you're ready.
       {% else %}
         One step left — <a href="/onboarding">tell us who you are</a> so posts sound like you.
       {% endif %}
     </p>
-
-    <ul class="facts">
-      <li><b>{{ 'Business' if user.account_type.value == 'business' else 'Personal' }}</b> account</li>
-      {% if user.role_title %}<li>{{ user.role_title }}</li>{% endif %}
-      {% if user.niche %}<li>{{ user.niche }}</li>{% endif %}
-      <li>Tone <b>{{ user.default_tone.value }}</b></li>
-      <li>{{ user.timezone }}</li>
-    </ul>
-
-    <p class="muted" style="margin-top:22px"><a href="/onboarding">Edit profile</a></p>
   </div>
 
-  <div class="card">
-    <h2>Coming next</h2>
-    <p class="sub">Composition lands in phase 4 — topic in, three drafts out. Nothing can be published yet.</p>
+  <div class="compose">
+    <div class="txt">
+      <h2>Write a post</h2>
+      <p>A topic, a type, a tone — three drafts back in about a minute.</p>
+    </div>
+    <span class="btn btn-white" aria-disabled="true" title="Arrives in phase 4">Coming in phase 4</span>
+  </div>
+
+  <div class="statrow">
+    <div class="stat {% if not counts.draft %}zero{% endif %}">
+      <b>{{ counts.draft }}</b><span>Drafts</span>
+    </div>
+    <div class="stat {% if not counts.scheduled %}zero{% endif %}">
+      <b>{{ counts.scheduled }}</b><span>Scheduled</span>
+    </div>
+    <div class="stat {% if not counts.posted %}zero{% endif %}">
+      <b>{{ counts.posted }}</b><span>Published</span>
+    </div>
+  </div>
+
+  {% if not counts.draft and not counts.scheduled and not counts.posted %}
+  <div class="empty">
+    <div class="icon" aria-hidden="true">✍️</div>
+    <h3>No posts yet</h3>
+    <p>Once drafting is live, everything you write will show up here.</p>
+  </div>
+  {% endif %}
+
+  <div class="rowcard">
+    <div style="flex:1 1 260px;min-width:0">
+      <h3>Your writing profile</h3>
+      <p>Used in every prompt so drafts sound like you.</p>
+      <ul class="facts">
+        <li><b>{{ 'Business' if user.account_type.value == 'business' else 'Personal' }}</b></li>
+        {% if user.role_title %}<li>{{ user.role_title }}</li>{% endif %}
+        {% if user.niche %}<li>{{ user.niche }}</li>{% endif %}
+        <li>Tone <b>{{ user.default_tone.value }}</b></li>
+        <li>{{ user.timezone }}</li>
+      </ul>
+    </div>
+    <a class="btn btn-ghost" href="/onboarding">Edit</a>
+  </div>
+
+  <div class="rowcard">
+    <div style="flex:1 1 260px;min-width:0">
+      <h3>LinkedIn connection</h3>
+      <p>
+        {% if days_left is not none and days_left > 0 %}
+          Active — {{ days_left }} days left. LinkedIn caps this at 60 and issues no refresh token,
+          so reconnecting is a normal part of using the app.
+        {% else %}
+          Expired. Reconnect to publish again.
+        {% endif %}
+      </p>
+      {% if days_left is not none and days_left > 0 %}
+      <div class="meter" role="img" aria-label="{{ days_left }} of 60 days remaining">
+        <i style="width: {{ (days_left / 60 * 100) | round(0, 'floor') | int }}%"></i>
+      </div>
+      {% endif %}
+    </div>
+    <a class="btn btn-ghost" href="/auth/login">Reconnect</a>
   </div>
 </div>
 
