@@ -176,8 +176,16 @@ class Post(Base):
     )
     tone: Mapped[Tone] = mapped_column(_enum(Tone, "tone"), nullable=False)
 
-    # Final text, already sanitized and little-escaped (plan section 9).
+    # Plain text, as the reader will see it -- markdown already stripped, but
+    # NOT `little`-escaped. Escaping happens once, at the publish boundary, so
+    # there is a single source of truth: the preview renders `content`
+    # directly, and publisher.py escapes it on the way out. Storing the escaped
+    # form instead would mean un-escaping to display it, and two encodings of
+    # the same text is how they drift apart.
     content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # Kept apart from `content` so publishing can build LinkedIn's
+    # {hashtag|\#|Tag} templates without parsing them back out of prose.
+    hashtags: Mapped[Optional[list]] = mapped_column(JSONB)
     # Kept for v2 (F21). Links live in the body in v1.
     first_comment: Mapped[Optional[str]] = mapped_column(Text)
 
