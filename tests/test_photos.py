@@ -129,3 +129,49 @@ def test_paths_are_not_guessable():
 
 def test_path_keeps_the_extension():
     assert storage.object_path(7, "webp").endswith(".webp")
+
+
+# ---------------------------------------------------------------------------
+# Deleting
+# ---------------------------------------------------------------------------
+
+class FakeDeleteResponse:
+    def __init__(self, status, payload=None, text=""):
+        self.status_code = status
+        self._payload = payload
+        self.text = text
+
+    def json(self):
+        if self._payload is None:
+            raise ValueError("no json")
+        return self._payload
+
+
+def test_a_missing_object_is_treated_as_already_deleted():
+    """Supabase reports a missing object as HTTP 400 with an inner 404, so the
+    status code alone would make a retried deletion look like a failure."""
+    resp = FakeDeleteResponse(400, {"statusCode": "404", "error": "not_found",
+                                    "code": "NoSuchKey"})
+    assert storage._already_gone(resp)
+
+
+def test_a_plain_404_also_counts_as_gone():
+    assert storage._already_gone(FakeDeleteResponse(404))
+
+
+def test_a_real_failure_is_not_mistaken_for_a_missing_object():
+    denied = FakeDeleteResponse(400, {"statusCode": "403", "error": "Unauthorized"})
+    assert not storage._already_gone(denied)
+
+
+def test_a_non_json_error_body_is_not_treated_as_gone():
+    assert not storage._already_gone(FakeDeleteResponse(400, None, "<html>502</html>"))
+
+
+def test_delete_is_silent_when_the_object_was_already_removed(monkeypatch, caplog):
+    monkeypatch.setattr(storage, "_base", lambda: ("https://x", "key", "bucket"))
+    monkeypatch.setattr(storage.httpx, "request", lambda *a, **k: FakeDeleteResponse(
+        400, {"statusCode": "404", "error": "not_found"}))
+    with caplog.at_level("WARNING"):
+        storage.delete("users/1/posts/gone.jpg")
+    assert not caplog.records, "a retried deletion should not log a failure"

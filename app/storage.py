@@ -40,6 +40,17 @@ def _base() -> tuple[str, str, str]:
     return s.storage_url.rstrip("/"), s.storage_key, s.storage_bucket
 
 
+def _auth_headers(key: str) -> dict[str, str]:
+    """Supabase accepts two key formats and wants both headers.
+
+    Legacy keys are signed JWTs ("eyJ..."); newer projects issue opaque secret
+    keys ("sb_secret_..."). Either goes in both `Authorization` and `apikey` --
+    the gateway checks one and the storage service the other, and which one
+    depends on the project's key settings.
+    """
+    return {"Authorization": f"Bearer {key}", "apikey": key}
+
+
 def object_path(user_id: int, extension: str, prefix: str = "posts") -> str:
     """A unguessable per-user path.
 
@@ -54,8 +65,7 @@ def put(data: bytes, path: str, content_type: str) -> StoredImage:
     base, key, bucket = _base()
     resp = httpx.post(
         f"{base}/storage/v1/object/{bucket}/{path}",
-        headers={
-            "Authorization": f"Bearer {key}",
+        headers=_auth_headers(key) | {
             "Content-Type": content_type,
             "x-upsert": "true",
         },
@@ -74,18 +84,36 @@ def put(data: bytes, path: str, content_type: str) -> StoredImage:
     )
 
 
+def _already_gone(resp: httpx.Response) -> bool:
+    """Supabase reports a missing object as HTTP 400 with an inner 404.
+
+    Checking the status code alone is not enough: an already-deleted object
+    would look like a failure, and account deletion (F4) must be safe to retry.
+    """
+    if resp.status_code == 404:
+        return True
+    if resp.status_code != 400:
+        return False
+    try:
+        body = resp.json()
+    except ValueError:
+        return False
+    return str(body.get("statusCode")) == "404" or body.get("error") == "not_found"
+
+
 def delete(path: str) -> None:
-    """Remove one object. Missing objects are not an error -- deletion is
-    idempotent so account deletion (F4) can be retried safely."""
+    """Remove one object. Missing objects are not an error, so deletion is
+    idempotent and account deletion (F4) can be retried safely."""
     base, key, bucket = _base()
     resp = httpx.request(
         "DELETE",
         f"{base}/storage/v1/object/{bucket}/{path}",
-        headers={"Authorization": f"Bearer {key}"},
+        headers=_auth_headers(key),
         timeout=30,
     )
-    if resp.status_code not in (200, 204, 404):
-        log.warning("storage delete failed %s: %s", resp.status_code, resp.text[:200])
+    if resp.status_code in (200, 204) or _already_gone(resp):
+        return
+    log.warning("storage delete failed %s: %s", resp.status_code, resp.text[:200])
 
 
 def fetch(url: str, *, max_bytes: int = 10 * 1024 * 1024) -> bytes:
