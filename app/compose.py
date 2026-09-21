@@ -18,10 +18,10 @@ import urllib.parse
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from app import llm, photos, publisher, sanitize, storage, uploads
+from app import llm, photos, publisher, sanitize, scheduling, storage, uploads
 from app.auth import require_user, token_is_expiring
 from app.config import get_settings
 from app.database import get_db
@@ -211,6 +211,12 @@ def editor(post_id: int, request: Request, q: str | None = None,
         photo_error=photo_error, dry_run=get_settings().dry_run,
         token_expiring=token_is_expiring(user),
         message=request.query_params.get("m"),
+        scheduled_for=scheduling.display(post.scheduled_at, user.timezone),
+        schedule_value=(scheduling.input_value(post.scheduled_at, user.timezone)
+                        or scheduling.suggest(user.timezone)),
+        schedule_min=scheduling.input_value(
+            scheduling.now_utc() + scheduling.MIN_LEAD, user.timezone),
+        tz_name=user.timezone,
     )
 
 
@@ -318,12 +324,77 @@ def publish(post_id: int, user: User = Depends(require_user),
     return RedirectResponse(f"/posts/{post.id}?m=published", status_code=303)
 
 
+# ---------------------------------------------------------------------------
+# Scheduling (F19)
+# ---------------------------------------------------------------------------
+#
+# Both transitions are conditional UPDATEs rather than "load, change, save".
+# The worker may claim this row at any moment. A plain ORM save issued just
+# after the claim would overwrite `publishing` with `scheduled`, and the post
+# would go out now and again at the new time. The WHERE clause makes the
+# database refuse instead.
+
+_SCHEDULE = text("""
+    UPDATE posts
+    SET status = 'scheduled', scheduled_at = :at, retry_count = 0, error_message = NULL
+    WHERE id = :id AND user_id = :uid AND status IN ('draft', 'failed', 'scheduled')
+    RETURNING id
+""")
+
+_UNSCHEDULE = text("""
+    UPDATE posts SET status = 'draft', scheduled_at = NULL
+    WHERE id = :id AND user_id = :uid AND status = 'scheduled'
+    RETURNING id
+""")
+
+
+def _back(post_id: int, message: str):
+    return RedirectResponse(f"/posts/{post_id}?m={urllib.parse.quote(message)}", status_code=303)
+
+
+@router.post("/posts/{post_id}/schedule")
+def schedule(post_id: int, when: str = Form(""),
+             user: User = Depends(require_user), db: Session = Depends(get_db)):
+    """Schedule a draft, or move an already-scheduled post to a new time."""
+    post = _own_post(db, user, post_id)
+    if not post.content.strip():
+        return _back(post.id, "There's nothing to schedule yet.")
+    if sanitize.prepare(post.content, post.hashtags or []).too_long:
+        return _back(post.id, "That's over LinkedIn's 3,000 characters.")
+
+    try:
+        at = scheduling.parse_local(when, user.timezone)
+        scheduling.validate(at, user)
+    except scheduling.ScheduleError as exc:
+        return _back(post.id, str(exc))
+
+    changed = db.execute(_SCHEDULE, {"at": at, "id": post.id, "uid": user.id}).first()
+    db.commit()
+    if changed is None:
+        return _back(post.id, "That post is being published right now and can't be rescheduled.")
+    return RedirectResponse(f"/posts/{post.id}?m=scheduled", status_code=303)
+
+
+@router.post("/posts/{post_id}/unschedule")
+def unschedule(post_id: int, user: User = Depends(require_user),
+               db: Session = Depends(get_db)):
+    """Cancel a schedule and return the post to draft."""
+    post = _own_post(db, user, post_id)
+    changed = db.execute(_UNSCHEDULE, {"id": post.id, "uid": user.id}).first()
+    db.commit()
+    if changed is None:
+        return _back(post.id, "Too late to cancel — it's already being published.")
+    return RedirectResponse(f"/posts/{post.id}?m=unscheduled", status_code=303)
+
+
 @router.post("/posts/{post_id}/delete")
 def delete(post_id: int, user: User = Depends(require_user),
            db: Session = Depends(get_db)):
     post = _own_post(db, user, post_id)
     if post.status in {PostStatus.publishing, PostStatus.posted}:
         raise HTTPException(400, "Published posts are removed from LinkedIn, not here.")
+    if post.status is PostStatus.scheduled:
+        return _back(post.id, "Cancel the schedule first, then delete.")
     _clear_images(db, post)
     db.delete(post)
     db.commit()
@@ -336,4 +407,6 @@ def history(request: Request, user: User = Depends(require_user),
     posts = db.scalars(
         select(Post).where(Post.user_id == user.id).order_by(Post.created_at.desc()).limit(100)
     ).all()
-    return _render(request, "posts.html", user=user, posts=posts)
+    when = {p.id: scheduling.display(p.scheduled_at, user.timezone)
+            for p in posts if p.status is PostStatus.scheduled}
+    return _render(request, "posts.html", user=user, posts=posts, when=when)

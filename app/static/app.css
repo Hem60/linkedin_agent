@@ -492,6 +492,16 @@ textarea { min-height: 76px; resize: vertical; }
 .badge.failed     { background: #fdecec; color: #8a1c1c; }
 .badge.dry_run    { background: #efe9ff; color: #4b2fb0; }
 
+.schedule { margin-top: 18px; }
+.schedule input[type=datetime-local] {
+  flex: 1 1 220px; padding: 10px 12px; font: inherit; font-size: 15px; color: var(--ink);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  color-scheme: light dark;
+}
+.schedule input[type=datetime-local]:focus {
+  outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-dim);
+}
+
 /* history */
 .plist { display: flex; flex-direction: column; gap: 10px; }
 .prow {

@@ -25,6 +25,7 @@
         {{ p.post_category.value | capitalize }} · {{ p.tone.value }} ·
         {{ p.created_at.strftime('%d %b %Y') }}
         {% if p.chosen_draft is none and p.drafts %} · <b>pick a draft</b>{% endif %}
+        {% if when.get(p.id) %} · <b>{{ when[p.id] }}</b>{% endif %}
       </div>
     </div>
     <span class="badge {{ p.status.value }}">{{ p.status.value.replace('_', ' ') }}</span>

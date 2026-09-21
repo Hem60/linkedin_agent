@@ -211,6 +211,10 @@ class Post(Base):
         _enum(PostStatus, "post_status"), nullable=False, default=PostStatus.draft
     )
     scheduled_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
+    # When a worker moved this row to `publishing`. A row still publishing long
+    # after this was interrupted mid-flight (a crash, a deploy) and needs a
+    # human decision -- see worker/scheduler.py:recover_stuck.
+    claimed_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
 
     model_used: Mapped[Optional[ModelUsed]] = mapped_column(_enum(ModelUsed, "model_used"))
     linkedin_post_id: Mapped[Optional[str]] = mapped_column(String(128))

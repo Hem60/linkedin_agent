@@ -50,7 +50,7 @@ def _now() -> dt.datetime:
 # ---------------------------------------------------------------------------
 
 _CLAIM_DUE = text("""
-    UPDATE posts SET status = 'publishing'
+    UPDATE posts SET status = 'publishing', claimed_at = now()
     WHERE id IN (
         SELECT id FROM posts
         WHERE status = 'scheduled' AND scheduled_at <= now()
@@ -62,7 +62,7 @@ _CLAIM_DUE = text("""
 """)
 
 _CLAIM_ONE = text("""
-    UPDATE posts SET status = 'publishing'
+    UPDATE posts SET status = 'publishing', claimed_at = now()
     WHERE id = (
         SELECT id FROM posts
         WHERE id = :post_id AND status IN ('draft', 'scheduled')

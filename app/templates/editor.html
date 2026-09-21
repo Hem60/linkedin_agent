@@ -4,6 +4,8 @@
 {% set messages = {
   'saved': 'Saved.',
   'image': 'Image added.',
+  'scheduled': 'Scheduled for ' ~ scheduled_for ~ '. It will publish automatically — you can close this tab.',
+  'unscheduled': 'Schedule cancelled. The post is back to draft.',
   'published': ('Dry run complete — everything was built and checked, but nothing was sent to LinkedIn.'
                 if post.status.value == 'dry_run' else 'Published to LinkedIn.'),
 } %}
@@ -118,11 +120,44 @@
           <button class="btn btn-danger" type="submit">Delete draft</button>
         </form>
       </div>
+
+      <form method="post" action="/posts/{{ post.id }}/schedule" class="schedule" id="sched">
+        <label for="when">Or schedule it <span class="hint">— your time, {{ tz_name }}</span></label>
+        <div class="imgrow">
+          <input type="datetime-local" id="when" name="when" required
+                 value="{{ schedule_value }}" min="{{ schedule_min }}">
+          <button class="btn btn-ghost" type="submit">Schedule</button>
+        </div>
+      </form>
       {% else %}
         {% if post.status.value == 'dry_run' %}
           <h2>This was a dry run</h2>
           <p class="sub">Everything was built and checked, but nothing went to LinkedIn.
             Dry runs can't be edited — <a href="/new">write a new post</a> to try again.</p>
+        {% elif post.status.value == 'scheduled' %}
+          <h2>Scheduled</h2>
+          <p class="sub"><b>{{ scheduled_for }}</b> — it publishes automatically, even with this tab closed.
+            To change the text, cancel the schedule first.</p>
+
+          <form method="post" action="/posts/{{ post.id }}/schedule" class="schedule">
+            <label for="when">Move it to</label>
+            <div class="imgrow">
+              <input type="datetime-local" id="when" name="when" required
+                     value="{{ schedule_value }}" min="{{ schedule_min }}">
+              <button class="btn btn-ghost" type="submit">Reschedule</button>
+            </div>
+          </form>
+
+          <div class="actions">
+            <form method="post" action="/posts/{{ post.id }}/publish">
+              <button class="btn btn-primary" type="submit">
+                {{ 'Run publish now (dry run)' if dry_run else 'Publish now instead' }}
+              </button>
+            </form>
+            <form method="post" action="/posts/{{ post.id }}/unschedule">
+              <button class="btn btn-ghost" type="submit">Cancel schedule</button>
+            </form>
+          </div>
         {% elif post.status.value == 'posted' %}
           <h2>Published</h2>
           <p class="sub">To change or remove it, edit it on LinkedIn directly.</p>
@@ -210,6 +245,15 @@
   ta.addEventListener('input', function () { dirty = true; });
   tags.addEventListener('input', function () { dirty = true; });
   document.getElementById('edit').addEventListener('submit', function () { dirty = false; });
+
+  var sched = document.getElementById('sched');
+  if (sched) sched.addEventListener('submit', function (e) {
+    // Scheduling reads the saved version, exactly like publishing does.
+    if (dirty) {
+      e.preventDefault();
+      alert('Save your changes first — scheduling uses the saved version.');
+    }
+  });
 
   document.getElementById('pub').addEventListener('submit', function (e) {
     // Publishing reads the saved version. Unsaved edits would silently not go out.

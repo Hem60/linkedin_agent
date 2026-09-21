@@ -63,6 +63,9 @@ class Settings(BaseSettings):
 
     # --- Behaviour --------------------------------------------------------
     dry_run: bool = True
+    # Run the publishing worker inside the web process (plan section 14,
+    # option 1). Safe alongside a separate worker: claims use SKIP LOCKED.
+    run_scheduler: bool = True
     daily_post_limit: int = 3
     daily_rewrite_limit: int = 10
     admin_emails: str = ""

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse
@@ -46,7 +47,27 @@ if settings.sentry_dsn:
 else:
     log.info("Sentry disabled (no SENTRY_DSN)")
 
-app = FastAPI(title="PostPilot", version="0.1.0")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Start the publishing worker with the web app, stop it on shutdown.
+
+    Plan section 14, option 1: on a free tier the web process is the only one
+    there is, so it also publishes scheduled posts. RUN_SCHEDULER=false turns
+    that off when a separate `python -m worker.scheduler` process runs instead
+    -- though running both is safe, because claims use SKIP LOCKED.
+    """
+    from worker.scheduler import loop
+
+    if settings.run_scheduler:
+        loop.start()
+    try:
+        yield
+    finally:
+        if settings.run_scheduler:
+            loop.stop()
+
+
+app = FastAPI(title="PostPilot", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     SessionMiddleware,

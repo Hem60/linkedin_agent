@@ -28,6 +28,8 @@ TEST_SCHEMA = os.environ.get("TEST_DB_SCHEMA", "test_postpilot")
 # Must happen before `app` is imported anywhere.
 os.environ["DB_SCHEMA"] = TEST_SCHEMA
 os.environ["DRY_RUN"] = "true"
+# The worker must not tick in the background while tests arrange data.
+os.environ["RUN_SCHEDULER"] = "false"
 
 import pytest  # noqa: E402
 
