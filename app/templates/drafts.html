@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Pick a draft · PostPilot{% endblock %}
+
+{% block content %}
+<div class="wide">
+  <div class="pagehead">
+    <div class="crumbs"><a href="/">Dashboard</a> / <a href="/posts">Posts</a> / Drafts</div>
+    <h1>Pick a draft</h1>
+    <p>“{{ post.topic }}” · {{ post.post_category.value | capitalize }} · {{ post.tone.value }}
+       · written by {{ post.model_used.value | capitalize if post.model_used else 'the model' }}</p>
+  </div>
+
+  <div class="drafts">
+    {% for c in cards %}
+    <article class="draft {% if loop.index0 == best %}best{% endif %}">
+      {% if loop.index0 == best %}<span class="ribbon">Highest score</span>{% endif %}
+      <header>
+        <b>Draft {{ loop.index }}</b>
+        <div class="scores">
+          {% for k, v in (c.score or {}).items() %}
+          <span>{{ k }} <b>{{ v }}</b></span>
+          {% endfor %}
+        </div>
+      </header>
+      <div class="body">{{ c.preview }}</div>
+      {% if c.improvement %}<p class="note">{{ c.improvement }}</p>{% endif %}
+      <footer>
+        <span class="len">{{ c.length }} / 3000</span>
+        <form method="post" action="/posts/{{ post.id }}/choose">
+          <input type="hidden" name="index" value="{{ c.index }}">
+          <button class="btn {% if loop.index0 == best %}btn-primary{% else %}btn-ghost{% endif %}"
+                  type="submit">Use this one</button>
+        </form>
+      </footer>
+    </article>
+    {% endfor %}
+  </div>
+
+  <p class="muted" style="margin-top:20px">
+    You can edit anything on the next screen. Not happy with any of them?
+    <a href="/new">Try a different topic</a>.
+  </p>
+</div>
+{% endblock %}

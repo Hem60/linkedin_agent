@@ -61,6 +61,14 @@ def object_path(user_id: int, extension: str, prefix: str = "posts") -> str:
     return f"users/{user_id}/{prefix}/{secrets.token_urlsafe(16)}.{extension}"
 
 
+def path_from_url(url: str) -> str | None:
+    """Recover the object path from a public URL, so an image can be deleted
+    knowing only what the post_images row stores."""
+    _, _, bucket = _base()
+    marker = f"/storage/v1/object/public/{bucket}/"
+    return url.split(marker, 1)[1] if marker in url else None
+
+
 def put(data: bytes, path: str, content_type: str) -> StoredImage:
     base, key, bucket = _base()
     resp = httpx.post(

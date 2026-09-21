@@ -192,6 +192,14 @@ class Post(Base):
     edited_by_user: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     quality_score: Mapped[Optional[dict]] = mapped_column(JSONB)
 
+    # All three drafts from the generation, so the user can switch to another
+    # one later without spending another model call.
+    drafts: Mapped[Optional[list]] = mapped_column(JSONB)
+    chosen_draft: Mapped[Optional[int]] = mapped_column(Integer)
+    photo_query: Mapped[str] = mapped_column(
+        String(200), nullable=False, default="", server_default=""
+    )
+
     account_type: Mapped[AccountType] = mapped_column(
         _enum(AccountType, "account_type"), nullable=False, default=AccountType.personal
     )

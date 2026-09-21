@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Edit post · PostPilot{% endblock %}
+
+{% set messages = {
+  'saved': 'Saved.',
+  'image': 'Image added.',
+  'published': ('Dry run complete — everything was built and checked, but nothing was sent to LinkedIn.'
+                if post.status.value == 'dry_run' else 'Published to LinkedIn.'),
+} %}
+
+{% block content %}
+<div class="wide">
+  <div class="pagehead">
+    <div class="crumbs"><a href="/">Dashboard</a> / <a href="/posts">Posts</a> / Edit</div>
+    <h1 style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      {{ post.topic }}
+      <span class="badge {{ post.status.value }}">{{ post.status.value.replace('_', ' ') }}</span>
+    </h1>
+    {% if post.drafts and editable %}
+      <p><a href="/posts/{{ post.id }}/drafts">← Back to the three drafts</a></p>
+    {% endif %}
+  </div>
+
+  {% if message %}
+    <div class="{{ 'flash' if message in messages else 'error' }}" role="status">
+      {{ messages.get(message, message) }}
+    </div>
+  {% endif %}
+
+  {% if post.status.value == 'failed' and post.error_message %}
+    <div class="error" role="alert"><b>Publishing failed:</b> {{ post.error_message }}</div>
+  {% endif %}
+
+  {% if post.status.value == 'posted' and post.linkedin_post_id %}
+    <div class="flash">
+      Live on LinkedIn —
+      <a href="https://www.linkedin.com/feed/update/{{ post.linkedin_post_id }}/" target="_blank" rel="noopener">view the post</a>
+    </div>
+  {% endif %}
+
+  {% if editable and dry_run %}
+    <div class="notice">
+      <span aria-hidden="true">●</span>
+      <div><b>Dry run is on.</b> Publishing will build and check everything but won't send it to LinkedIn.
+        Set <code>DRY_RUN=false</code> in <code>.env</code> when you're ready to post for real.</div>
+    </div>
+  {% endif %}
+
+  <div class="editor">
+    <!-- left: edit -->
+    <div class="card">
+      {% if editable %}
+      <form method="post" action="/posts/{{ post.id }}" id="edit">
+        <label for="content">Post</label>
+        <textarea id="content" name="content">{{ post.content }}</textarea>
+        <div class="counter">
+          <span>Markdown is removed on save — LinkedIn shows plain text.</span>
+          <span id="count"></span>
+        </div>
+
+        <label for="hashtags">Hashtags <span class="hint">— separated by spaces or commas</span></label>
+        <input type="text" id="hashtags" name="hashtags"
+               value="{{ (post.hashtags or []) | join(' ') }}">
+
+        <div style="margin-top:16px">
+          <button class="btn btn-ghost" type="submit">Save changes</button>
+        </div>
+      </form>
+
+      <div class="imgbox">
+        <label>Image</label>
+        {% if post.images %}
+          <form method="post" action="/posts/{{ post.id }}/image/remove" style="margin-top:6px">
+            <button class="btn btn-ghost" type="submit">Remove image</button>
+          </form>
+        {% endif %}
+
+        <form method="get" action="/posts/{{ post.id }}" class="imgrow">
+          <input type="text" name="q" value="{{ photo_query }}" placeholder="search stock photos">
+          <button class="btn btn-ghost" type="submit">Find photos</button>
+        </form>
+
+        {% if photo_error %}<p class="muted" style="color:#c0392b">{{ photo_error }}</p>{% endif %}
+
+        {% if candidates %}
+        <div class="picker">
+          {% for p in candidates %}
+          <form method="post" action="/posts/{{ post.id }}/image/pexels">
+            <input type="hidden" name="url" value="{{ p.url }}">
+            <button type="submit" title="Use this photo">
+              <img src="{{ p.preview_url }}" alt="{{ p.alt or 'Stock photo' }}" loading="lazy">
+            </button>
+            <div class="by">{{ p.credit }}</div>
+          </form>
+          {% endfor %}
+        </div>
+        {% elif photo_query is not none and request.query_params.get('q') is not none and not photo_error %}
+          <p class="muted">No photos for that search. Try fewer, simpler words.</p>
+        {% endif %}
+
+        <form method="post" action="/posts/{{ post.id }}/image/upload"
+              enctype="multipart/form-data" class="imgrow">
+          <input type="file" name="file" accept="image/jpeg,image/png,image/webp" required>
+          <button class="btn btn-ghost" type="submit">Upload your own</button>
+        </form>
+        <p class="muted">JPG, PNG or WebP, up to 5 MB. Location data is stripped automatically.</p>
+      </div>
+
+      <div class="actions">
+        <form method="post" action="/posts/{{ post.id }}/publish" id="pub">
+          <button class="btn btn-primary" type="submit" id="pubbtn">
+            <span class="spinner" aria-hidden="true"></span>
+            {{ 'Run publish (dry run)' if dry_run else ('Retry publishing' if post.status.value == 'failed' else 'Publish now') }}
+          </button>
+        </form>
+        <form method="post" action="/posts/{{ post.id }}/delete"
+              onsubmit="return confirm('Delete this draft? This can\'t be undone.')">
+          <button class="btn btn-danger" type="submit">Delete draft</button>
+        </form>
+      </div>
+      {% else %}
+        <h2>This post is {{ post.status.value.replace('_', ' ') }}</h2>
+        <p class="sub">Published and dry-run posts can't be edited.
+          <a href="/new">Write a new one</a>.</p>
+      {% endif %}
+    </div>
+
+    <!-- right: preview -->
+    <div class="preview-card">
+      <div class="panel">
+        <div class="panel-head"><span class="dotrow"><i></i><i></i><i></i></span> Preview</div>
+        <div class="post-head">
+          <div class="avatar" aria-hidden="true">{{ (user.name or '?')[:1] }}{{ (user.name.split(' ')[-1] or '')[:1] if ' ' in user.name else '' }}</div>
+          <div class="meta"><b>{{ user.name }}</b><span>{{ user.role_title or 'LinkedIn member' }} · now</span></div>
+        </div>
+        <div class="post-body" id="pv">{{ post.content }}</div>
+        <div class="post-body tags" id="pvtags" style="padding-top:0">{% for t in post.hashtags or [] %}#{{ t }} {% endfor %}</div>
+        {% if post.images %}<img src="{{ post.images[0].url }}" alt="Post image">{% endif %}
+        <div class="post-foot">
+          <span aria-hidden="true">👍 Like</span><span aria-hidden="true">💬 Comment</span><span aria-hidden="true">↗ Share</span>
+          <span class="score" id="pvcount">{{ prep.length }} / 3000</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var ta = document.getElementById('content');
+  var tags = document.getElementById('hashtags');
+  if (!ta) return;
+  var pv = document.getElementById('pv'), pvt = document.getElementById('pvtags');
+  var count = document.getElementById('count'), pvcount = document.getElementById('pvcount');
+
+  function tagList() {
+    return tags.value.replace(/,/g, ' ').split(/\s+/)
+      .map(function (t) { return t.replace(/^#+/, '').replace(/[^0-9A-Za-z]/g, ''); })
+      .filter(Boolean);
+  }
+
+  // Mirrors sanitize.rendered_text: body, a blank line, then the hashtag line.
+  // The server remains authoritative -- markdown is only stripped on save.
+  function update() {
+    var t = tagList();
+    var line = t.map(function (x) { return '#' + x; }).join(' ');
+    var n = ta.value.trim().length + (t.length ? line.length + 2 : 0);
+    var left = 3000 - n;
+    count.innerHTML = left >= 0 ? n + ' / 3000' : '<span class="over">' + n + ' / 3000 — ' + (-left) + ' over</span>';
+    pvcount.textContent = n + ' / 3000';
+    pv.textContent = ta.value;
+    pvt.textContent = line;
+  }
+  ta.addEventListener('input', update);
+  tags.addEventListener('input', update);
+  update();
+
+  var dirty = false;
+  ta.addEventListener('input', function () { dirty = true; });
+  tags.addEventListener('input', function () { dirty = true; });
+  document.getElementById('edit').addEventListener('submit', function () { dirty = false; });
+
+  document.getElementById('pub').addEventListener('submit', function (e) {
+    // Publishing reads the saved version. Unsaved edits would silently not go out.
+    if (dirty) {
+      e.preventDefault();
+      alert('Save your changes first — publishing uses the saved version.');
+      return;
+    }
+    var b = document.getElementById('pubbtn');
+    b.classList.add('busy'); b.disabled = true;
+  });
+})();
+</script>
+{% endblock %}

@@ -240,7 +240,7 @@
     <h1>Welcome back, {{ user.name.split(' ')[0] }}</h1>
     <p>
       {% if user.onboarded_at %}
-        Everything's set up. Pick a topic when you're ready.
+        Everything's set up. Pick a topic when you're ready — or see <a href="/posts">your posts</a>.
       {% else %}
         One step left — <a href="/onboarding">tell us who you are</a> so posts sound like you.
       {% endif %}
@@ -252,7 +252,7 @@
       <h2>Write a post</h2>
       <p>A topic, a type, a tone — three drafts back in about a minute.</p>
     </div>
-    <span class="btn btn-white" aria-disabled="true" title="Arrives in phase 4">Coming in phase 4</span>
+    <a class="btn btn-white" href="/new">Start writing →</a>
   </div>
 
   <div class="statrow">
@@ -271,7 +271,7 @@
   <div class="empty">
     <div class="icon" aria-hidden="true">✍️</div>
     <h3>No posts yet</h3>
-    <p>Once drafting is live, everything you write will show up here.</p>
+    <p><a href="/new">Write your first one</a> — it takes about a minute.</p>
   </div>
   {% endif %}
 

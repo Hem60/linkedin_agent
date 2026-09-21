@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
-from app import auth, onboarding
+from app import auth, compose, onboarding
 from app.auth import current_user, token_is_expiring
 from app.config import get_settings
 from app.database import engine, get_db
@@ -125,6 +125,7 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 app.include_router(auth.router)
 app.include_router(onboarding.router)
+app.include_router(compose.router)
 
 
 @app.get("/", response_class=HTMLResponse)

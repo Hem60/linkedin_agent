@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Your posts · PostPilot{% endblock %}
+{% block shell_class %}narrow{% endblock %}
+
+{% block content %}
+<div class="pagehead" style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap">
+  <div>
+    <div class="crumbs"><a href="/">Dashboard</a> / Posts</div>
+    <h1>Your posts</h1>
+    <p>{{ posts | length }} total</p>
+  </div>
+  <a class="btn btn-primary" href="/new">Write a post</a>
+</div>
+
+{% if posts %}
+<div class="plist">
+  {% for p in posts %}
+  <a class="prow" href="/posts/{{ p.id }}{% if p.chosen_draft is none and p.drafts %}/drafts{% endif %}">
+    <div class="thumb">
+      {% if p.images %}<img src="{{ p.images[0].url }}" alt="" loading="lazy">{% else %}<span aria-hidden="true">✎</span>{% endif %}
+    </div>
+    <div style="min-width:0">
+      <div class="t">{{ p.topic }}</div>
+      <div class="m">
+        {{ p.post_category.value | capitalize }} · {{ p.tone.value }} ·
+        {{ p.created_at.strftime('%d %b %Y') }}
+        {% if p.chosen_draft is none and p.drafts %} · <b>pick a draft</b>{% endif %}
+      </div>
+    </div>
+    <span class="badge {{ p.status.value }}">{{ p.status.value.replace('_', ' ') }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+  <div class="icon" aria-hidden="true">✍️</div>
+  <h3>No posts yet</h3>
+  <p><a href="/new">Write your first one</a> — it takes about a minute.</p>
+</div>
+{% endif %}
+{% endblock %}

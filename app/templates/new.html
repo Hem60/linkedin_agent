@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Write a post · PostPilot{% endblock %}
+{% block shell_class %}narrow{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div class="crumbs"><a href="/">Dashboard</a> / New post</div>
+  <h1>What do you want to talk about?</h1>
+  <p>One line is enough. You'll get three drafts to choose from.</p>
+</div>
+
+{% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
+
+<form method="post" action="/new" class="card" id="compose">
+  <label for="topic">Topic</label>
+  <input type="text" id="topic" name="topic" maxlength="500" required autofocus
+         value="{{ form.topic or '' }}"
+         placeholder="what I learned tuning our RAG pipeline">
+
+  <label>Post type</label>
+  <div class="typepick">
+    {% for key, spec in types.items() %}
+    <label>
+      <input type="radio" name="post_category" value="{{ key.value }}"
+             data-question="{{ spec.question or '' }}"
+             {% if (form.post_category or 'learning') == key.value %}checked{% endif %}>
+      {{ spec.label }}
+      <small>{{ spec.structure.split(',')[0] }}</small>
+    </label>
+    {% endfor %}
+  </div>
+
+  <div id="extra-wrap" hidden>
+    <label for="extra_answer"><span id="extra-q"></span> <span class="hint">— optional</span></label>
+    <input type="text" id="extra_answer" name="extra_answer" maxlength="300"
+           value="{{ form.extra_answer or '' }}">
+  </div>
+
+  <label>Tone</label>
+  <div class="tonepick">
+    {% for t in tones %}
+    <label>
+      <input type="radio" name="tone" value="{{ t.value }}"
+             {% if form.tone == t.value %}checked{% endif %}>
+      {{ t.value | capitalize }}
+    </label>
+    {% endfor %}
+  </div>
+
+  <div style="margin-top:28px">
+    <button type="submit" class="btn btn-primary btn-lg" id="go">
+      <span class="spinner" aria-hidden="true"></span>
+      <span id="go-label">Write three drafts</span>
+    </button>
+    <p class="muted" style="margin-top:10px">Takes about ten seconds.</p>
+  </div>
+</form>
+
+<script>
+(function () {
+  var wrap = document.getElementById('extra-wrap');
+  var q = document.getElementById('extra-q');
+  function sync() {
+    var picked = document.querySelector('input[name=post_category]:checked');
+    var question = picked ? picked.dataset.question : '';
+    wrap.hidden = !question;
+    q.textContent = question;
+  }
+  document.querySelectorAll('input[name=post_category]').forEach(function (r) {
+    r.addEventListener('change', sync);
+  });
+  sync();
+
+  // Generation blocks for several seconds; a second click would spend a second
+  // model call and create a duplicate post.
+  document.getElementById('compose').addEventListener('submit', function () {
+    var btn = document.getElementById('go');
+    btn.classList.add('busy');
+    btn.disabled = true;
+    document.getElementById('go-label').textContent = 'Writing your drafts…';
+  });
+})();
+</script>
+{% endblock %}
