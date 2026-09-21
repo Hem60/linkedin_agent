@@ -67,6 +67,27 @@ uvicorn app.main:app --reload
 pytest -q
 ```
 
+Tests run in their own Postgres schema, `test_postpilot`, never in `public`.
+`tests/conftest.py` forces `DB_SCHEMA` before the app is imported, migrates the
+test schema to head, and empties it at the start of each run.
+
+This matters because some tests are necessarily global: the publish lock's
+claim query takes *any* due scheduled post, exactly as the worker does. Against
+the real tables, a test run would claim a real user's scheduled post and mark it
+published through a fake LinkedIn, so it would never actually go out.
+
+The suite refuses to start if the schema isn't a test schema:
+
+```
+TEST_DB_SCHEMA=public pytest   # exits 2: "Refusing to run"
+```
+
+Unit tests alone, no database, about two seconds:
+
+```
+pytest -m "not integration"
+```
+
 ## Safety
 
 `DRY_RUN=true` is the default and means nothing is published to LinkedIn: posts

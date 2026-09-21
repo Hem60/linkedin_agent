@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     session_secret: str
     encryption_key: str
 
+    # Postgres schema to use. Empty means the default (`public`), which is
+    # where the real app lives. The test suite sets this to `test_postpilot`
+    # so tests can never read or modify real users' posts -- see
+    # tests/conftest.py.
+    db_schema: str = ""
+
     # --- LinkedIn ---------------------------------------------------------
     linkedin_client_id: str = ""
     linkedin_client_secret: str = ""

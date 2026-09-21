@@ -9,10 +9,10 @@ from __future__ import annotations
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, pool, text
 
 from app.config import get_settings
-from app.database import Base
+from app.database import Base, validated_schema
 
 # Importing the models module registers every table on Base.metadata so that
 # `alembic revision --autogenerate` can see them. Added in phase 2.
@@ -49,12 +49,24 @@ def run_migrations_online() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
+    schema = get_settings().db_schema
     with connectable.connect() as connection:
+        if schema:
+            # Same isolation as app/database.py: create the schema, put it first
+            # on the search path, and keep Alembic's own bookkeeping table there
+            # too -- otherwise the test schema's migration history would be
+            # written into the real public.alembic_version.
+            schema = validated_schema(schema)
+            connection.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
+            connection.execute(text(f"SET SESSION search_path TO {schema}, public"))
+            connection.commit()
+
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,        # catch column type changes
             compare_server_default=True,
+            version_table_schema=schema or None,
         )
         with context.begin_transaction():
             context.run_migrations()
