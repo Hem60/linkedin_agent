@@ -165,6 +165,18 @@
 </div>
 
 <script>
+// Land where the user's attention is. The server's redirect already carries
+// #preview or #photos, but some embedded browsers drop a fragment after a POST
+// redirect, so the page also scrolls itself based on what just happened.
+(function () {
+  var m = new URLSearchParams(location.search);
+  var target = m.get('m') === 'image' ? 'preview' : (m.has('q') ? 'photos' : null);
+  if (target && !location.hash) {
+    var el = document.getElementById(target);
+    if (el) window.addEventListener('load', function () { el.scrollIntoView({ block: 'start' }); });
+  }
+})();
+
 (function () {
   var ta = document.getElementById('content');
   var tags = document.getElementById('hashtags');
