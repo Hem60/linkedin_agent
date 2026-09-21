@@ -181,6 +181,21 @@ def test_an_over_length_post_cannot_be_published(client, db, monkeypatch):
     assert "3%2C000" in r.headers["location"] or "3,000" in r.headers["location"]
 
 
+def test_a_dry_run_can_be_deleted_from_its_page(client, db):
+    """Dry runs are practice. Without a Delete button, every test run would
+    leave a post the user can never remove from the app."""
+    pid = create(client)
+    client.post(f"/posts/{pid}/choose", data={"index": 0})
+    client.post(f"/posts/{pid}/publish")                         # dry run
+    page = client.get(f"/posts/{pid}").text
+    assert f'action="/posts/{pid}/delete"' in page
+    assert "This was a dry run" in page
+
+    assert client.post(f"/posts/{pid}/delete").status_code == 303
+    db.expire_all()
+    assert db.get(Post, pid) is None
+
+
 def test_a_published_post_can_no_longer_be_edited(client, db):
     pid = create(client)
     client.post(f"/posts/{pid}/choose", data={"index": 0})

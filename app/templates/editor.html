@@ -67,7 +67,7 @@
         </div>
       </form>
 
-      <div class="imgbox">
+      <div class="imgbox" id="photos">
         <label>Image</label>
         {% if post.images %}
           <form method="post" action="/posts/{{ post.id }}/image/remove" style="margin-top:6px">
@@ -75,7 +75,7 @@
           </form>
         {% endif %}
 
-        <form method="get" action="/posts/{{ post.id }}" class="imgrow">
+        <form method="get" action="/posts/{{ post.id }}#photos" class="imgrow">
           <input type="text" name="q" value="{{ photo_query }}" placeholder="search stock photos">
           <button class="btn btn-ghost" type="submit">Find photos</button>
         </form>
@@ -119,14 +119,33 @@
         </form>
       </div>
       {% else %}
-        <h2>This post is {{ post.status.value.replace('_', ' ') }}</h2>
-        <p class="sub">Published and dry-run posts can't be edited.
-          <a href="/new">Write a new one</a>.</p>
+        {% if post.status.value == 'dry_run' %}
+          <h2>This was a dry run</h2>
+          <p class="sub">Everything was built and checked, but nothing went to LinkedIn.
+            Dry runs can't be edited — <a href="/new">write a new post</a> to try again.</p>
+        {% elif post.status.value == 'posted' %}
+          <h2>Published</h2>
+          <p class="sub">To change or remove it, edit it on LinkedIn directly.</p>
+        {% else %}
+          <h2>{{ post.status.value | capitalize }}</h2>
+          <p class="sub">This post can't be edited right now.</p>
+        {% endif %}
+
+        {% if post.status.value == 'dry_run' %}
+        {# Dry runs are practice. Without this, every test run leaves a post the
+           user can never remove from the app. #}
+        <div class="actions">
+          <form method="post" action="/posts/{{ post.id }}/delete"
+                onsubmit="return confirm('Delete this dry run? This can\'t be undone.')">
+            <button class="btn btn-danger" type="submit">Delete</button>
+          </form>
+        </div>
+        {% endif %}
       {% endif %}
     </div>
 
     <!-- right: preview -->
-    <div class="preview-card">
+    <div class="preview-card" id="preview">
       <div class="panel">
         <div class="panel-head"><span class="dotrow"><i></i><i></i><i></i></span> Preview</div>
         <div class="post-head">

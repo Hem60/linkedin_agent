@@ -255,7 +255,7 @@ def pick_pexels(post_id: int, url: str = Form(...),
     except (uploads.ImageRejected, storage.StorageError) as exc:
         return RedirectResponse(
             f"/posts/{post.id}?m={urllib.parse.quote(str(exc))}", status_code=303)
-    return RedirectResponse(f"/posts/{post.id}?m=image", status_code=303)
+    return RedirectResponse(f"/posts/{post.id}?m=image#preview", status_code=303)
 
 
 @router.post("/posts/{post_id}/image/upload")
@@ -274,7 +274,7 @@ async def upload_image(post_id: int, file: UploadFile = File(...),
     except (uploads.ImageRejected, storage.StorageError) as exc:
         return RedirectResponse(
             f"/posts/{post.id}?m={urllib.parse.quote(str(exc))}", status_code=303)
-    return RedirectResponse(f"/posts/{post.id}?m=image", status_code=303)
+    return RedirectResponse(f"/posts/{post.id}?m=image#preview", status_code=303)
 
 
 @router.post("/posts/{post_id}/image/remove")
