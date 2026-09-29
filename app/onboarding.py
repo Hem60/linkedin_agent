@@ -11,6 +11,7 @@ Kept separate from auth.py, which is already carrying the OAuth flow.
 from __future__ import annotations
 
 import datetime as dt
+import urllib.parse
 import zoneinfo
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -31,6 +32,22 @@ SUGGESTED_TIMEZONES = [
     "America/New_York", "America/Chicago", "America/Los_Angeles",
     "Australia/Sydney", "UTC",
 ]
+
+
+def _valid_page_url(url: str) -> str:
+    """Only a LinkedIn company page. The app renders this as a link the user
+    clicks, so an arbitrary address here would be a link we invited them to
+    trust."""
+    url = url.strip()
+    if not url:
+        return ""
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+    parsed = urllib.parse.urlparse(url)
+    host = (parsed.hostname or "").lower().removeprefix("www.")
+    if host != "linkedin.com" or "/company/" not in parsed.path:
+        return ""
+    return url[:300]
 
 
 def _valid_timezone(name: str) -> str:
@@ -70,6 +87,7 @@ def save(
     products: str = Form(""),
     target_markets: str = Form(""),
     buyer_types: str = Form(""),
+    company_page_url: str = Form(""),
 ):
     user.account_type = (
         AccountType.business if account_type == "business" else AccountType.personal
@@ -84,6 +102,7 @@ def save(
         user.products = products.strip()
         user.target_markets = target_markets.strip()
         user.buyer_types = buyer_types.strip()
+        user.company_page_url = _valid_page_url(company_page_url)
     else:
         # Switching back to personal clears business context rather than leaving
         # stale company details to leak into a future business post.
@@ -91,6 +110,7 @@ def save(
         user.products = ""
         user.target_markets = ""
         user.buyer_types = ""
+        user.company_page_url = ""
 
     user.onboarded_at = dt.datetime.now(dt.timezone.utc)
     db.commit()

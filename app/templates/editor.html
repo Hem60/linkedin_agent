@@ -6,6 +6,7 @@
   'image': 'Image added.',
   'scheduled': 'Scheduled for ' ~ scheduled_for ~ '. It will publish automatically — you can close this tab.',
   'unscheduled': 'Schedule cancelled. The post is back to draft.',
+  'copied': 'Marked as posted to your company page.',
   'published': ('Dry run complete — everything was built and checked, but nothing was sent to LinkedIn.'
                 if post.status.value == 'dry_run' else 'Published to LinkedIn.'),
 } %}
@@ -120,6 +121,35 @@
           <button class="btn btn-danger" type="submit">Delete draft</button>
         </form>
       </div>
+
+      {% if is_brand %}
+      <div class="brandbox" id="companypage">
+        <h3>Post this to your company page</h3>
+        <p>LinkedIn doesn't let this app publish to a company page — that needs a
+          separate approval from them. So: copy the post, open your page, and paste.
+          The buttons above publish to <b>your own profile</b> instead.</p>
+
+        <div class="imgrow">
+          <button type="button" class="btn btn-primary" id="copybtn"
+                  data-text="{{ copy_text }}">Copy the post</button>
+          {% if company_page_url %}
+            <a class="btn btn-ghost" href="{{ company_page_url }}" target="_blank" rel="noopener">
+              Open your page ↗</a>
+          {% else %}
+            <a class="btn btn-ghost" href="/onboarding">Add your page link</a>
+          {% endif %}
+          <form method="post" action="/posts/{{ post.id }}/copied" style="margin:0">
+            <button class="btn btn-ghost" type="submit">Mark as done</button>
+          </form>
+        </div>
+        {% if post.copied_at %}
+          <p class="muted" style="margin-top:10px">✓ Marked as posted to your page.</p>
+        {% endif %}
+        <p class="muted" style="margin-top:10px">
+          Copies the text exactly as it will look — no formatting codes.
+        </p>
+      </div>
+      {% endif %}
 
       <form method="post" action="/posts/{{ post.id }}/schedule" class="schedule" id="sched">
         <label for="when">Or schedule it <span class="hint">— your time, {{ tz_name }}</span></label>
@@ -245,6 +275,33 @@
   ta.addEventListener('input', function () { dirty = true; });
   tags.addEventListener('input', function () { dirty = true; });
   document.getElementById('edit').addEventListener('submit', function () { dirty = false; });
+
+  var copybtn = document.getElementById('copybtn');
+  if (copybtn) copybtn.addEventListener('click', function () {
+    var text = copybtn.dataset.text;
+    function done() {
+      copybtn.textContent = 'Copied ✓';
+      setTimeout(function () { copybtn.textContent = 'Copy the post'; }, 2500);
+    }
+    // navigator.clipboard needs a secure context and permission; fall back to a
+    // hidden textarea so the button always does something.
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else {
+      fallback();
+    }
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); done(); }
+      catch (e) { alert('Select the text in the preview and copy it manually.'); }
+      document.body.removeChild(ta);
+    }
+  });
 
   var sched = document.getElementById('sched');
   if (sched) sched.addEventListener('submit', function (e) {

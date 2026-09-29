@@ -26,6 +26,7 @@ from app.config import get_settings
 from app.templating import templates
 from app.database import get_db
 from app.models import (
+    AccountType,
     ImageSource,
     Post,
     PostCategory,
@@ -100,8 +101,10 @@ def new_form(request: Request, user: User = Depends(require_user),
              db: Session = Depends(get_db)):
     return _render(
         request, "new.html", user=user, types=POST_TYPES, tones=list(TONES),
-        form={"tone": user.default_tone.value}, error=None,
-        usage=limits.current(db, user),
+        form={"tone": user.default_tone.value,
+              "post_category": ("business" if user.account_type is AccountType.business
+                                else "learning")},
+        error=None, usage=limits.current(db, user),
     )
 
 
@@ -223,6 +226,9 @@ def editor(post_id: int, request: Request, q: str | None = None,
         photo_error=photo_error, dry_run=get_settings().dry_run,
         token_expiring=token_is_expiring(user),
         message=request.query_params.get("m"),
+        is_brand=(post.post_category is PostCategory.business),
+        company_page_url=user.company_page_url,
+        copy_text=prep.preview,
         scheduled_for=scheduling.display(post.scheduled_at, user.timezone),
         schedule_value=(scheduling.input_value(post.scheduled_at, user.timezone)
                         or scheduling.suggest(user.timezone)),
@@ -397,6 +403,35 @@ def unschedule(post_id: int, user: User = Depends(require_user),
     if changed is None:
         return _back(post.id, "Too late to cancel — it's already being published.")
     return RedirectResponse(f"/posts/{post.id}?m=unscheduled", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Company pages (F20)
+# ---------------------------------------------------------------------------
+#
+# LinkedIn will not let this app publish to a company page: that needs
+# Community Management access, which is a separate application on a separate
+# developer app (plan section 2). So the app does everything up to the last
+# step and hands over the finished text.
+#
+# What gets handed over is the *rendered* text, not the escaped commentary.
+# The user is pasting into LinkedIn's own composer, which takes plain text;
+# `little` escaping exists only for the API, and pasting it would publish
+# visible backslashes.
+
+@router.post("/posts/{post_id}/copied")
+def mark_copied(post_id: int, user: User = Depends(require_user),
+                db: Session = Depends(get_db)):
+    """Record that the user took this to their company page.
+
+    Deliberately not a status change. The app never sees the post reach
+    LinkedIn, so calling it `posted` would be a claim we cannot support -- and
+    `posted` rows are expected to carry a LinkedIn id.
+    """
+    post = _own_post(db, user, post_id)
+    post.copied_at = scheduling.now_utc()
+    db.commit()
+    return RedirectResponse(f"/posts/{post.id}?m=copied", status_code=303)
 
 
 @router.post("/posts/{post_id}/delete")

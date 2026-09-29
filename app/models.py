@@ -131,6 +131,13 @@ class User(Base):
     products: Mapped[str] = mapped_column(Text, nullable=False, default="")
     target_markets: Mapped[str] = mapped_column(Text, nullable=False, default="")
     buyer_types: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # Where the finished brand post gets pasted. Publishing to a company page
+    # through the API needs Community Management access we do not have
+    # (plan section 2), so F20 hands the text to the user instead -- and a link
+    # straight to their page is most of what makes that bearable.
+    company_page_url: Mapped[str] = mapped_column(
+        String(300), nullable=False, default="", server_default=""
+    )
 
     default_tone: Mapped[Tone] = mapped_column(
         _enum(Tone, "tone"), nullable=False, default=Tone.professional
@@ -231,6 +238,9 @@ class Post(Base):
         DateTime(timezone=True), nullable=False, server_default=_utcnow
     )
     posted_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
+    # When the user copied this for their company page (F20). Not a status: the
+    # app never sees it reach LinkedIn, so claiming "posted" would be a lie.
+    copied_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
 
     user: Mapped["User"] = relationship(back_populates="posts")
     images: Mapped[list["PostImage"]] = relationship(

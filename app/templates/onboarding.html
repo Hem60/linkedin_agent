@@ -63,6 +63,12 @@
 
         <label for="buyer_types">Buyer types <span class="hint">— who you want to reach</span></label>
         <textarea id="buyer_types" name="buyer_types" placeholder="Importers, distributors, EPC contractors">{{ user.buyer_types }}</textarea>
+
+        <label for="company_page_url">Your LinkedIn company page
+          <span class="hint">— optional, for one-click pasting</span></label>
+        <input type="text" id="company_page_url" name="company_page_url" maxlength="300"
+               value="{{ user.company_page_url }}"
+               placeholder="linkedin.com/company/your-company">
       </div>
 
       <div style="margin-top:28px">

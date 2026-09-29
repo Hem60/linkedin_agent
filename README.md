@@ -111,6 +111,27 @@ only to addresses listed in `ADMIN_EMAILS`, and shows counts only — never post
 text. Anyone else gets a 404 rather than a 403, so the page's existence isn't
 confirmed.
 
+## Business mode
+
+A business account gets the brand post structure -- emoji hook, product
+paragraph, feature bullets, a call to action naming the buyers -- and 8-10
+hashtags mixing brand, product, country and buyer tags. Not the 30 the original
+plan allowed: that suppresses reach rather than extending it.
+
+Publishing to a LinkedIn **company page** is not possible from this app.
+`w_organization_social` needs Community Management access, which is a separate
+application on a separate developer app (plan section 2). So the app does
+everything up to the last step and hands over the finished text: Copy, open your
+page, paste.
+
+What it hands over is the *rendered* text, not the escaped `commentary`. You are
+pasting into LinkedIn's own composer, which takes plain text; the escaping
+exists only for the API, and pasting it would publish visible backslashes.
+
+Marking a post as done sets `copied_at`. It is deliberately not a status change:
+the app never sees the post reach LinkedIn, so calling it `posted` would be a
+claim it cannot support.
+
 ## Safety
 
 `DRY_RUN=true` is the default and means nothing is published to LinkedIn: posts
