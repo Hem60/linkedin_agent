@@ -141,6 +141,11 @@ class User(Base):
     # "is set up" from whether role_title happens to be non-empty.
     onboarded_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
 
+    # When we last warned that the LinkedIn token is about to expire. Without
+    # this the daily sweep would send the same warning every day for a week,
+    # which teaches people to ignore it. Cleared on reconnect.
+    expiry_notified_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
+
     # F4: soft delete, so a deletion request can be honoured without orphaning rows.
     deleted_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
 

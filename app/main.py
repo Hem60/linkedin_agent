@@ -14,15 +14,15 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
-from app import auth, compose, onboarding
+from app import admin, auth, compose, onboarding
 from app.auth import current_user, token_is_expiring
 from app.config import get_settings
+from app.templating import templates
 from app.database import engine, get_db
 from app.models import Post, User
 
@@ -141,12 +141,12 @@ def healthz() -> dict[str, object]:
     }
 
 
-templates = Jinja2Templates(directory="app/templates")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 app.include_router(auth.router)
 app.include_router(onboarding.router)
 app.include_router(compose.router)
+app.include_router(admin.router)
 
 
 @app.get("/", response_class=HTMLResponse)

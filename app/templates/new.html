@@ -6,10 +6,22 @@
 <div class="pagehead">
   <div class="crumbs"><a href="/">Dashboard</a> / New post</div>
   <h1>What do you want to talk about?</h1>
-  <p>One line is enough. You'll get three drafts to choose from.</p>
+  <p>One line is enough. You'll get three drafts to choose from.
+    {% if usage and usage.post_limit %}
+      <span class="muted">· {{ usage.posts_left }} of {{ usage.post_limit }} left today</span>
+    {% endif %}
+  </p>
 </div>
 
 {% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
+
+{% if usage and usage.at_limit %}
+  <div class="notice">
+    <span aria-hidden="true">●</span>
+    <div>You've used today's {{ usage.post_limit }} posts. The limit resets at your midnight —
+      it keeps one account from spending the shared model quota for everyone.</div>
+  </div>
+{% endif %}
 
 <form method="post" action="/new" class="card" id="compose">
   <label for="topic">Topic</label>

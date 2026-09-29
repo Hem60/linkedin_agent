@@ -228,6 +228,9 @@ def upsert_user(
     user.token_expires_at = token_expires_at
     # Reconnecting undoes a soft delete rather than stranding the account.
     user.deleted_at = None
+    # A fresh token means the old expiry warning is spent; clearing it lets the
+    # next lapse warn again in two months' time.
+    user.expiry_notified_at = None
 
     db.commit()
     db.refresh(user)

@@ -22,6 +22,7 @@
     {% if user %}
     <div class="whoami">
       <span class="name">{{ user.name }}</span>
+      {% if is_admin(user) %}<a href="/admin">Usage</a>{% endif %}
       <a href="/auth/logout">Sign out</a>
     </div>
     {% endif %}

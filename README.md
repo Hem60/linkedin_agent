@@ -88,6 +88,29 @@ Unit tests alone, no database, about two seconds:
 pytest -m "not integration"
 ```
 
+## Limits, email and admin
+
+`DAILY_POST_LIMIT` caps how many posts one account can generate per day, to stop
+one person exhausting the shared Gemini/Groq free quota. The day is the *user's*
+day, not UTC — a limit that resets at UTC midnight would reset at 05:30 in India.
+Set it to `0` for a private deployment where the quota is nobody else's problem.
+
+Email uses [Resend](https://resend.com) and is entirely optional: without
+`RESEND_API_KEY` and `EMAIL_FROM` the app runs normally and simply doesn't send.
+Two messages exist, both because the alternative is silence:
+
+- a scheduled post gave up (sent once, when it stops retrying)
+- the LinkedIn connection expires within 7 days (at most weekly)
+
+On Resend's free tier, until you verify a domain you can only send from
+`onboarding@resend.dev` and only to the address the Resend account was created
+with. A rejected send is logged, never raised.
+
+`/admin` shows usage per day and per person for the last 14 days. It is visible
+only to addresses listed in `ADMIN_EMAILS`, and shows counts only — never post
+text. Anyone else gets a 404 rather than a 403, so the page's existence isn't
+confirmed.
+
 ## Safety
 
 `DRY_RUN=true` is the default and means nothing is published to LinkedIn: posts

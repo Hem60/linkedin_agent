@@ -17,13 +17,13 @@ import urllib.parse
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from app import llm, photos, publisher, sanitize, scheduling, storage, uploads
+from app import limits, llm, photos, publisher, sanitize, scheduling, storage, uploads
 from app.auth import require_user, token_is_expiring
 from app.config import get_settings
+from app.templating import templates
 from app.database import get_db
 from app.models import (
     ImageSource,
@@ -38,7 +38,6 @@ from app.prompts import POST_TYPES, TONES
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["compose"])
-templates = Jinja2Templates(directory="app/templates")
 
 EDITABLE = {PostStatus.draft, PostStatus.failed}
 PEXELS_IMAGE_HOSTS = {"images.pexels.com"}
@@ -97,10 +96,12 @@ def _attach(db: Session, post: Post, prepared: uploads.PreparedImage,
 # ---------------------------------------------------------------------------
 
 @router.get("/new")
-def new_form(request: Request, user: User = Depends(require_user)):
+def new_form(request: Request, user: User = Depends(require_user),
+             db: Session = Depends(get_db)):
     return _render(
         request, "new.html", user=user, types=POST_TYPES, tones=list(TONES),
         form={"tone": user.default_tone.value}, error=None,
+        usage=limits.current(db, user),
     )
 
 
@@ -120,7 +121,8 @@ def new_submit(
 
     def fail(message: str):
         return _render(request, "new.html", user=user, types=POST_TYPES,
-                       tones=list(TONES), form=form, error=message)
+                       tones=list(TONES), form=form, error=message,
+                       usage=limits.current(db, user))
 
     if len(topic) < 4:
         return fail("Give the topic a few more words so the drafts have something to work with.")
@@ -130,10 +132,20 @@ def new_submit(
     except ValueError:
         return fail("Pick a post type and a tone.")
 
+    # Consume the allowance before spending a model request, not after: the
+    # point is to protect a shared quota, and a request already made cannot be
+    # unmade (plan section 12).
+    try:
+        limits.take_post(db, user)
+    except limits.LimitReached as exc:
+        return fail(str(exc))
+
     try:
         gen = llm.generate(user, topic[:500], category, tone_, extra_answer[:300])
     except llm.GenerationError as exc:
         log.warning("generation failed for user %s: %s", user.id, exc)
+        # Nothing was billed, so nothing should be charged.
+        limits.refund_post(db, user)
         return fail("Both writing models are busy right now. Try again in a minute.")
 
     drafts = [

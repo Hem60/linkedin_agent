@@ -15,15 +15,14 @@ import zoneinfo
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.auth import require_user
 from app.database import get_db
+from app.templating import templates
 from app.models import AccountType, Tone, User
 
 router = APIRouter(tags=["onboarding"])
-templates = Jinja2Templates(directory="app/templates")
 
 # Offered in the picker. Any IANA zone is accepted; these are just the common ones.
 SUGGESTED_TIMEZONES = [

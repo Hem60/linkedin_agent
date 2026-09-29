@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Usage · PostPilot{% endblock %}
+
+{% block content %}
+<div class="wide">
+  <div class="pagehead">
+    <div class="crumbs"><a href="/">Dashboard</a> / Admin</div>
+    <h1>Usage</h1>
+    <p>Last {{ days }} days. Shows how hard the shared model quota is being used — nothing else.</p>
+  </div>
+
+  <div class="statrow" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))">
+    <div class="stat {% if not total_users %}zero{% endif %}">
+      <b>{{ total_users }}</b><span>Accounts</span>
+    </div>
+    <div class="stat {% if not busiest %}zero{% endif %}">
+      <b>{{ busiest }}</b><span>Busiest day</span>
+    </div>
+    <div class="stat {% if not outcomes.get('posted') %}zero{% endif %}">
+      <b>{{ outcomes.get('posted', 0) }}</b><span>Published</span>
+    </div>
+    <div class="stat {% if not outcomes.get('failed') %}zero{% endif %}">
+      <b>{{ outcomes.get('failed', 0) }}</b><span>Failed</span>
+    </div>
+  </div>
+
+  <ul class="facts" style="margin-top:16px">
+    <li>Daily limit <b>{{ post_limit or 'off' }}</b> per person</li>
+    <li>Dry run <b>{{ 'on' if dry_run else 'off' }}</b></li>
+    <li>Email <b>{{ 'on' if email_on else 'off' }}</b></li>
+    <li>Drafts <b>{{ outcomes.get('draft', 0) }}</b></li>
+    <li>Scheduled <b>{{ outcomes.get('scheduled', 0) }}</b></li>
+    <li>Dry runs <b>{{ outcomes.get('dry_run', 0) }}</b></li>
+  </ul>
+
+  <div class="card" style="margin-top:22px">
+    <h2>Posts generated per day</h2>
+    <p class="sub">Each person's day starts at their own midnight, not UTC.</p>
+    {% if daily %}
+      <table class="usage">
+        <thead><tr><th>Day</th><th>Generated</th><th>People</th><th></th></tr></thead>
+        <tbody>
+        {% for row in daily %}
+          <tr>
+            <td>{{ row.date.strftime('%a %d %b') }}</td>
+            <td><b>{{ row.generated }}</b></td>
+            <td>{{ row.active_users }}</td>
+            <td class="bar">
+              <i style="width: {{ ((row.generated / busiest) * 100) | round | int if busiest else 0 }}%"></i>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="muted">No posts generated yet.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>By person</h2>
+    <p class="sub">Counts only. Post text is never shown here.</p>
+    <table class="usage">
+      <thead><tr><th>Account</th><th>Timezone</th><th>Generated</th></tr></thead>
+      <tbody>
+      {% for row in by_user %}
+        <tr>
+          <td>{{ row.name or 'Unnamed' }}<br><span class="muted">{{ row.email }}</span></td>
+          <td class="muted">{{ row.timezone }}</td>
+          <td><b>{{ row.generated }}</b></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

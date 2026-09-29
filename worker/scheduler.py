@@ -25,8 +25,10 @@ from dataclasses import dataclass
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app import publisher
+from app import notify, publisher
+from app.config import get_settings
 from app.database import SessionLocal
+from app.models import User
 
 log = logging.getLogger("worker")
 
@@ -47,6 +49,7 @@ STUCK_MESSAGE = (
 @dataclass
 class TickResult:
     recovered: int = 0
+    warned: int = 0
     claimed: int = 0
     published: int = 0
     failed: int = 0
@@ -77,6 +80,47 @@ def recover_stuck(db: Session, *, older_than: dt.timedelta = STUCK_AFTER) -> int
     return len(rows)
 
 
+WARN_WITHIN = dt.timedelta(days=7)
+# Re-warn at most weekly. LinkedIn's window is 60 days, so a second nudge a
+# week later is a reminder; a daily one is noise people filter out.
+REWARN_AFTER = dt.timedelta(days=7)
+
+
+def warn_expiring_tokens(db: Session, *, now: dt.datetime | None = None) -> int:
+    """F5. Email users whose LinkedIn connection is about to lapse.
+
+    Runs on the same tick as everything else but is cheap: the query matches
+    nothing on all but a handful of days per user per two months.
+    """
+    now = now or dt.datetime.now(dt.timezone.utc)
+    users = db.execute(
+        text("""
+            SELECT id FROM users
+            WHERE deleted_at IS NULL
+              AND access_token IS NOT NULL
+              AND token_expires_at IS NOT NULL
+              AND token_expires_at < :deadline
+              AND (expiry_notified_at IS NULL OR expiry_notified_at < :rewarn)
+        """),
+        {"deadline": now + WARN_WITHIN, "rewarn": now - REWARN_AFTER},
+    ).scalars().all()
+
+    sent = 0
+    for user_id in users:
+        user = db.get(User, user_id)
+        days = (user.token_expires_at - now).days
+        if notify.token_expiring(user, days, get_settings().app_url):
+            sent += 1
+        # Stamped either way: if email is switched off or Resend is refusing,
+        # retrying every minute forever helps nobody.
+        user.expiry_notified_at = now
+        db.commit()
+
+    if sent:
+        log.info("warned %d user(s) about expiring LinkedIn tokens", sent)
+    return sent
+
+
 def run_once(db: Session | None = None, *, limit: int = BATCH) -> TickResult:
     """One tick. Never raises: a worker that dies on one bad post stops
     publishing everyone else's."""
@@ -85,6 +129,7 @@ def run_once(db: Session | None = None, *, limit: int = BATCH) -> TickResult:
     result = TickResult()
     try:
         result.recovered = recover_stuck(db)
+        result.warned = warn_expiring_tokens(db)
         claimed = publisher.claim_due(db, limit=limit)
         result.claimed = len(claimed)
         for post in claimed:
@@ -103,7 +148,7 @@ def run_once(db: Session | None = None, *, limit: int = BATCH) -> TickResult:
         if own:
             db.close()
 
-    if result.claimed or result.recovered:
+    if result.claimed or result.recovered or result.warned:
         log.info("tick: %s", result)
     return result
 

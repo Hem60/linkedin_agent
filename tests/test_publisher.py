@@ -80,12 +80,20 @@ def make_post(db, user, *, status=PostStatus.draft, scheduled_at=None,
     return p
 
 
+@pytest.fixture(autouse=True)
+def no_email(monkeypatch):
+    """No test here should send mail. Failure notifications are covered in
+    test_limits.py; here they would only add network calls."""
+    monkeypatch.setattr(publisher.notify, "post_failed", lambda *a, **k: False)
+
+
 @pytest.fixture
 def no_dry_run(monkeypatch):
     """Most tests want the real publishing path, not the dry-run short circuit."""
     class S:
         dry_run = False
         linkedin_api_version = "202609"
+        app_url = "http://localhost:8000"
     monkeypatch.setattr(publisher, "get_settings", lambda: S())
 
 
@@ -162,6 +170,7 @@ def test_two_workers_racing_publish_exactly_once(db, user, monkeypatch):
     class S:
         dry_run = False
         linkedin_api_version = "202609"
+        app_url = "http://localhost:8000"
 
     monkeypatch.setattr(publisher, "get_settings", lambda: S())
 
@@ -320,6 +329,26 @@ def test_a_failed_post_is_never_left_stuck_in_publishing(db, user, no_dry_run, m
 
     db.expire_all()
     assert db.get(Post, p.id).status is not PostStatus.publishing
+
+
+def test_a_broken_notifier_does_not_hide_the_real_failure(db, user, no_dry_run, monkeypatch):
+    """The failure email is sent from inside the caller's `except`. Anything
+    raised there replaces the real publish error with a misleading one -- which
+    is exactly what happened when reading a setting was left unguarded."""
+    monkeypatch.setattr(linkedin, "create_post",
+                        _fails("LinkedIn is unavailable", retryable=False, status=503))
+    monkeypatch.setattr(publisher.notify, "post_failed",
+                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("mail server down")))
+
+    p = make_post(db, user)
+    with pytest.raises(publisher.PublishError, match="LinkedIn is unavailable"):
+        publisher.publish(db, publisher.claim_one(db, p.id))
+
+    db.expire_all()
+    post = db.get(Post, p.id)
+    assert post.status is PostStatus.failed
+    assert "LinkedIn is unavailable" in post.error_message
+    assert "mail server" not in post.error_message
 
 
 def test_an_expired_token_fails_without_calling_linkedin(db, user, no_dry_run, monkeypatch):

@@ -25,7 +25,7 @@ import logging
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app import linkedin, sanitize, security, storage
+from app import linkedin, notify, sanitize, security, storage
 from app.config import get_settings
 from app.models import ImageSource, ModelUsed, Post, PostStatus, User
 
@@ -240,3 +240,17 @@ def _record_failure(db: Session, post: Post, message: str, *, retryable: bool) -
         log.error("post %d failed permanently: %s", post.id, message[:160])
 
     db.commit()
+
+    if post.status is PostStatus.failed:
+        # Only when it has given up. An email per retry is how people learn to
+        # ignore email.
+        #
+        # Guarded as a whole, not trusting notify's own guarantee: this runs
+        # inside the caller's `except`, so anything raised here would replace
+        # the real publish error with a misleading one. Reading the setting is
+        # part of that -- it was an unguarded attribute lookup here that turned
+        # three publish failures into AttributeErrors.
+        try:
+            notify.post_failed(post.user, post, get_settings().app_url)
+        except Exception:  # noqa: BLE001
+            log.exception("could not send the failure email for post %s", post.id)
