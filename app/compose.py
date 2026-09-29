@@ -192,8 +192,12 @@ def choose_draft(post_id: int, index: int = Form(...),
         raise HTTPException(400, "That draft can't be chosen.")
 
     d = post.drafts[index]
-    post.content = sanitize.strip_markdown(d["body"])
-    post.hashtags = d.get("hashtags") or []
+    tags = d.get("hashtags") or []
+    # The model sometimes ends the body with its own copy of the hashtag line,
+    # which would then be published twice. Drop it before the editor shows it.
+    post.content = sanitize.strip_duplicate_tag_line(
+        sanitize.strip_markdown(d["body"]), tags)
+    post.hashtags = tags
     post.photo_query = (d.get("photo_query") or "")[:200]
     post.quality_score = d.get("score")
     post.chosen_draft = index

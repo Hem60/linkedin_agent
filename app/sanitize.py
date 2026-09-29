@@ -138,6 +138,38 @@ def hashtag_template(tag: str) -> str:
 # Assembly
 # ---------------------------------------------------------------------------
 
+_TAG_WORD = re.compile(r"^#?[0-9A-Za-z]+$")
+
+
+def strip_duplicate_tag_line(body: str, hashtags: list[str] | tuple[str, ...] = ()) -> str:
+    """Drop a trailing line that only repeats the hashtags we are about to add.
+
+    Models sometimes end a draft with their own hashtag line -- and sometimes
+    write it without the "#", so it does not even read as tags -- while also
+    returning the same tags in the structured field. Appending ours then
+    publishes the words twice, once as prose and once as real hashtags.
+
+    Only a line whose every word is one of those hashtags is removed, so a
+    genuine closing sentence is never touched.
+    """
+    wanted = {normalise_tag(t).lower() for t in hashtags if normalise_tag(t)}
+    if not wanted:
+        return body
+
+    lines = body.rstrip().split("\n")
+    while lines:
+        last = lines[-1].strip()
+        if not last:                       # blank line above a tag line
+            lines.pop()
+            continue
+        words = last.split()
+        if all(_TAG_WORD.match(w) and normalise_tag(w).lower() in wanted for w in words):
+            lines.pop()
+            continue
+        break
+    return "\n".join(lines).rstrip()
+
+
 def build_commentary(body: str, hashtags: list[str] | tuple[str, ...] = ()) -> str:
     """The exact string to send as `commentary`. Assumes markdown is gone."""
     out = escape_little(body)
@@ -169,7 +201,7 @@ def prepare(body: str, hashtags: list[str] | tuple[str, ...] = ()) -> Prepared:
     The UI shows `preview`; the API receives `commentary`. They are the same
     text in two encodings, and confusing them is how posts break.
     """
-    clean = strip_markdown(body)
+    clean = strip_duplicate_tag_line(strip_markdown(body), hashtags)
     preview = rendered_text(clean, hashtags)
     return Prepared(
         commentary=build_commentary(clean, hashtags),
