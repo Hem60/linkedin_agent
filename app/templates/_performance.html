@@ -1,0 +1,23 @@
+{# Asking how a post did. Used on the dashboard and on a published post's page. #}
+<form method="post" action="/posts/{{ p.id }}/performance" class="perf">{{ csrf(request) }}
+  <div class="perf-topic">
+    <b>{{ p.topic }}</b>
+    <span class="muted">published {{ p.posted_at.strftime('%d %b') }}</span>
+  </div>
+  <div class="perf-fields">
+    <label class="sr" for="likes-{{ p.id }}">Likes</label>
+    <input type="text" inputmode="numeric" id="likes-{{ p.id }}" name="likes"
+           placeholder="likes" value="{{ existing.likes if existing and existing.likes is not none else '' }}">
+    <label class="sr" for="comments-{{ p.id }}">Comments</label>
+    <input type="text" inputmode="numeric" id="comments-{{ p.id }}" name="comments"
+           placeholder="comments" value="{{ existing.comments if existing and existing.comments is not none else '' }}">
+    <button class="btn btn-ghost" type="submit">Save</button>
+  </div>
+  <div class="perf-mood">
+    <span class="muted">or just:</span>
+    <button class="btn btn-ghost" type="submit" name="sentiment" value="up"
+            title="It did well">👍 Went well</button>
+    <button class="btn btn-ghost" type="submit" name="sentiment" value="down"
+            title="It fell flat">👎 Fell flat</button>
+  </div>
+</form>

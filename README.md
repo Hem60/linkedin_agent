@@ -157,6 +157,22 @@ which piece.
 registered `/posts/{post_id}` route to confirm none of them serves another
 user's post.
 
+## How did it do?
+
+LinkedIn will not give an app the likes and comments on a member's own posts:
+`r_member_social` is closed, in their own words "not accepting access requests
+at this time". So the numbers come from the person who can see them.
+
+Three days after a post is published, the dashboard asks. Typing the numbers is
+one option; a thumbs up or down counts as an answer too, because most people
+will not go and count comments and a weak signal offered willingly beats a
+precise one nobody gives.
+
+Only genuinely published posts are asked about -- a dry run never reached
+LinkedIn, so there is nothing to have gone well or badly. Answers can be
+corrected, and appear next to the post in history. This is what v2's insights
+page will be built on.
+
 ## Safety
 
 `DRY_RUN=true` is the default and means nothing is published to LinkedIn: posts

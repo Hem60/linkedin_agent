@@ -20,7 +20,10 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from app import limits, llm, photos, publisher, sanitize, scheduling, storage, uploads
+from app import (
+    limits, llm, performance, photos, publisher, sanitize, scheduling,
+    storage, uploads,
+)
 from app.auth import require_user, token_is_expiring
 from app.config import get_settings
 from app.templating import templates
@@ -226,6 +229,8 @@ def editor(post_id: int, request: Request, q: str | None = None,
         photo_error=photo_error, dry_run=get_settings().dry_run,
         token_expiring=token_is_expiring(user),
         message=request.query_params.get("m"),
+        can_rate=(post.status is PostStatus.posted),
+        reported=performance.reported(db, user).get(post.id),
         is_brand=(post.post_category is PostCategory.business),
         company_page_url=user.company_page_url,
         copy_text=prep.preview,
@@ -456,4 +461,5 @@ def history(request: Request, user: User = Depends(require_user),
     ).all()
     when = {p.id: scheduling.display(p.scheduled_at, user.timezone)
             for p in posts if p.status is PostStatus.scheduled}
-    return _render(request, "posts.html", user=user, posts=posts, when=when)
+    return _render(request, "posts.html", user=user, posts=posts, when=when,
+                   results=performance.reported(db, user))

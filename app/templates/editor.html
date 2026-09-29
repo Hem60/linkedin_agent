@@ -7,6 +7,7 @@
   'scheduled': 'Scheduled for ' ~ scheduled_for ~ '. It will publish automatically — you can close this tab.',
   'unscheduled': 'Schedule cancelled. The post is back to draft.',
   'copied': 'Marked as posted to your company page.',
+  'thanks': 'Thanks — noted.',
   'published': ('Dry run complete — everything was built and checked, but nothing was sent to LinkedIn.'
                 if post.status.value == 'dry_run' else 'Published to LinkedIn.'),
 } %}
@@ -191,6 +192,17 @@
         {% elif post.status.value == 'posted' %}
           <h2>Published</h2>
           <p class="sub">To change or remove it, edit it on LinkedIn directly.</p>
+
+          {% if can_rate %}
+            <div style="margin-top:20px;padding-top:18px;border-top:1px solid var(--line-2)">
+              <h3 style="margin:0 0 4px;font-size:15.5px">How did it do?</h3>
+              <p class="sub" style="margin-bottom:14px">LinkedIn doesn't share these
+                numbers with apps, so they only exist if you add them.</p>
+              {% set p = post %}
+              {% set existing = reported %}
+              {% include "_performance.html" %}
+            </div>
+          {% endif %}
         {% else %}
           <h2>{{ post.status.value | capitalize }}</h2>
           <p class="sub">This post can't be edited right now.</p>

@@ -247,6 +247,23 @@
     </p>
   </div>
 
+  {% if message == 'thanks' %}
+    <div class="flash">Thanks — noted. That's what the insights page will be built on.</div>
+  {% endif %}
+
+  {% if awaiting %}
+  <div class="card askcard">
+    <h2>How did {{ 'this post' if awaiting|length == 1 else 'these posts' }} do?</h2>
+    <p class="sub">LinkedIn doesn't share these numbers with apps, so they only
+      exist if you add them. Open the post on LinkedIn, look, and type what you see —
+      or just say whether it worked.</p>
+    {% for p in awaiting[:3] %}
+      {% set existing = none %}
+      {% include "_performance.html" %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <div class="compose">
     <div class="txt">
       <h2>Write a post</h2>

@@ -26,6 +26,12 @@
         {{ p.created_at.strftime('%d %b %Y') }}
         {% if p.chosen_draft is none and p.drafts %} · <b>pick a draft</b>{% endif %}
         {% if when.get(p.id) %} · <b>{{ when[p.id] }}</b>{% endif %}
+        {% set r = results.get(p.id) %}
+        {% if r %} ·
+          {% if r.likes is not none %}<b>{{ r.likes }}</b> likes{% endif %}
+          {% if r.comments is not none %}<b>{{ r.comments }}</b> comments{% endif %}
+          {% if r.sentiment %}{{ '👍' if r.sentiment == 'up' else '👎' }}{% endif %}
+        {% endif %}
       </div>
     </div>
     <span class="badge {{ p.status.value }}">{{ p.status.value.replace('_', ' ') }}</span>

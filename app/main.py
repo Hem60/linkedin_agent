@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
-from app import admin, auth, compose, csrf, onboarding, privacy
+from app import admin, auth, compose, csrf, onboarding, performance, privacy
 from app.auth import current_user, token_is_expiring
 from app.config import get_settings
 from app.templating import templates
@@ -152,6 +152,7 @@ app.include_router(onboarding.router)
 app.include_router(compose.router)
 app.include_router(admin.router)
 app.include_router(privacy.router)
+app.include_router(performance.router)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -163,7 +164,9 @@ def index(
 ):
     counts = {"draft": 0, "scheduled": 0, "posted": 0}
     days_left = None
+    awaiting = []
     if user:
+        awaiting = performance.pending(db, user)
         rows = db.execute(
             select(Post.status, func.count())
             .where(Post.user_id == user.id)
@@ -185,5 +188,7 @@ def index(
             "counts": counts,
             "days_left": days_left,
             "token_expiring": bool(user) and token_is_expiring(user),
+            "awaiting": awaiting,
+            "message": request.query_params.get("m"),
         },
     )
