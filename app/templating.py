@@ -25,3 +25,8 @@ def is_admin(user: User | None) -> bool:
 
 
 templates.env.globals["is_admin"] = is_admin
+
+# Every form needs this; see app/csrf.py.
+from app.csrf import field as _csrf_field  # noqa: E402
+
+templates.env.globals["csrf"] = _csrf_field

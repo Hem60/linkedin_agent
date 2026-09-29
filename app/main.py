@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 
-from app import admin, auth, compose, onboarding
+from app import admin, auth, compose, csrf, onboarding, privacy
 from app.auth import current_user, token_is_expiring
 from app.config import get_settings
 from app.templating import templates
@@ -68,6 +68,10 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="PostPilot", version="0.1.0", lifespan=lifespan)
+
+# Order matters: middleware added later runs first, so CSRF is registered
+# before SessionMiddleware in order to run *after* it -- it needs the session.
+app.add_middleware(csrf.CSRFMiddleware)
 
 app.add_middleware(
     SessionMiddleware,
@@ -147,6 +151,7 @@ app.include_router(auth.router)
 app.include_router(onboarding.router)
 app.include_router(compose.router)
 app.include_router(admin.router)
+app.include_router(privacy.router)
 
 
 @app.get("/", response_class=HTMLResponse)

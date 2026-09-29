@@ -26,7 +26,7 @@
       {% if c.improvement %}<p class="note">{{ c.improvement }}</p>{% endif %}
       <footer>
         <span class="len">{{ c.length }} / 3000</span>
-        <form method="post" action="/posts/{{ post.id }}/choose">
+        <form method="post" action="/posts/{{ post.id }}/choose">{{ csrf(request) }}
           <input type="hidden" name="index" value="{{ c.index }}">
           <button class="btn {% if loop.index0 == best %}btn-primary{% else %}btn-ghost{% endif %}"
                   type="submit">Use this one</button>

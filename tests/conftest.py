@@ -36,6 +36,55 @@ import pytest  # noqa: E402
 TABLES = ("post_performance", "post_images", "usage", "posts", "users")
 
 
+# ---------------------------------------------------------------------------
+# CSRF: behave like a browser
+# ---------------------------------------------------------------------------
+#
+# Every unsafe request needs the session's CSRF token. A real browser gets it
+# from the hidden field in the page it is submitting; a TestClient has no page.
+# Rather than thread a token through three hundred existing tests -- or, worse,
+# add a switch that turns the protection off and could reach production -- the
+# client reads it from the session cookie, which is signed rather than
+# encrypted and therefore readable by anything holding it. The protection
+# itself is exercised directly in tests/test_privacy.py.
+
+def _install_csrf_aware_test_client() -> None:
+    import json
+    from base64 import b64decode
+
+    from itsdangerous import BadSignature, TimestampSigner
+    from starlette.testclient import TestClient
+
+    from app.config import get_settings
+    from app.csrf import HEADER, SAFE_METHODS, SESSION_KEY
+
+    signer = TimestampSigner(str(get_settings().session_secret))
+    original = TestClient.request
+
+    def request(self, method, url, **kwargs):
+        if method.upper() not in SAFE_METHODS:
+            raw = self.cookies.get("session")
+            token = None
+            if raw:
+                try:
+                    # Starlette signs standard-base64 JSON; it is signed, not
+                    # encrypted, so the session's contents are readable here.
+                    data = json.loads(b64decode(signer.unsign(raw)))
+                    token = data.get(SESSION_KEY)
+                except (BadSignature, ValueError, KeyError):
+                    token = None
+            if token:
+                headers = dict(kwargs.get("headers") or {})
+                headers.setdefault(HEADER, token)
+                kwargs["headers"] = headers
+        return original(self, method, url, **kwargs)
+
+    TestClient.request = request
+
+
+_install_csrf_aware_test_client()
+
+
 def _guard(schema: str) -> None:
     if schema in ("", "public") or not schema.startswith("test"):
         pytest.exit(

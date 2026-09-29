@@ -24,7 +24,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import security
+from app import csrf, security
 from app.config import get_settings
 from app.database import get_db
 from app.models import User
@@ -186,6 +186,10 @@ def callback(
 
     request.session.clear()          # new session id contents after privilege change
     request.session[USER_KEY] = user.id
+    # Clearing the session took the CSRF token with it. Mint a fresh one rather
+    # than restoring the old: rotating on a privilege change is the point, and
+    # without this the first POST after signing in has nothing to check against.
+    csrf.token_for(request)
 
     return RedirectResponse(
         "/" if user.onboarded_at else "/onboarding", status_code=302

@@ -132,6 +132,31 @@ Marking a post as done sets `copied_at`. It is deliberately not a status change:
 the app never sees the post reach LinkedIn, so calling it `posted` would be a
 claim it cannot support.
 
+## Security and privacy
+
+**CSRF.** Every unsafe request needs a token tied to the session, and its Origin
+must match `APP_URL` when the browser sends one. Session cookies are
+`SameSite=Lax` as a third layer. Without this, another site could make a
+signed-in browser publish a post or delete an account. The token is rotated when
+someone signs in, since the session is cleared on a privilege change.
+
+**Leaving.** `/account` offers both halves of it:
+
+- **Export** — everything held about you as JSON. The LinkedIn access token is
+  deliberately excluded: it is a credential held on your behalf, not data about
+  you, and a plaintext token in a downloaded file is a hazard.
+- **Delete** — a real delete, not a flag. It reaches the database rows, the
+  image files in the storage bucket (no cascade goes there), and the LinkedIn
+  token. Typing DELETE is required. A failing bucket does not abandon the
+  deletion: a half-deleted account is worse than a leftover file.
+
+`/privacy` states what is stored, what is not, and which three services see
+which piece.
+
+**Ownership** is checked route by route, and `test_privacy.py` walks every
+registered `/posts/{post_id}` route to confirm none of them serves another
+user's post.
+
 ## Safety
 
 `DRY_RUN=true` is the default and means nothing is published to LinkedIn: posts

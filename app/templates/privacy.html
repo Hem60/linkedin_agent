@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Privacy · PostPilot{% endblock %}
+{% block shell_class %}narrow{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <h1>Privacy</h1>
+  <p>What PostPilot stores, why, and how to get rid of it.</p>
+</div>
+
+<div class="card">
+  <h2>What is stored</h2>
+  <p class="sub">Only what's needed to write posts that sound like you and publish them.</p>
+  <ul class="plain">
+    <li><b>From LinkedIn:</b> your name, your email, and your LinkedIn member id.</li>
+    <li><b>From you:</b> your role, the topics you post about, your preferred tone and
+      timezone. Business accounts also give a company name, products, markets and buyer types.</li>
+    <li><b>Your posts:</b> topics, drafts, edits, hashtags, schedules and outcomes.</li>
+    <li><b>Your images:</b> pictures you upload or pick, stored under your account only.</li>
+    <li><b>A permission to post:</b> a LinkedIn access token, encrypted before it is saved.</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>What is not stored</h2>
+  <ul class="plain">
+    <li>Your LinkedIn password. Sign-in happens on LinkedIn; this app never sees it.</li>
+    <li>Your connections, messages, feed, or anyone else's data.</li>
+    <li>Payment details. There are none.</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>Who else sees it</h2>
+  <p class="sub">Three services, each given only the piece it needs to do its job.</p>
+  <ul class="plain">
+    <li><b>Google Gemini and Groq</b> receive the topic you type and your role and
+      niche, in order to write the drafts. Free model tiers may use prompts to
+      improve their products — don't type anything confidential.</li>
+    <li><b>Pexels</b> receives a two or three word search phrase. Nothing else.</li>
+    <li><b>LinkedIn</b> receives the post you approve, when you publish it.</li>
+  </ul>
+  <p class="muted">Your data is never sold, and never shared with anyone else.</p>
+</div>
+
+<div class="card">
+  <h2>Nothing is published without you</h2>
+  <p class="sub">Every post is written, previewed and approved by you before it goes
+    anywhere. There is no automatic posting. A scheduled post publishes at the
+    time you picked, from the draft you approved.</p>
+</div>
+
+<div class="card">
+  <h2>Leaving</h2>
+  <p class="sub">You can take your data with you or erase it, at any time, from
+    <a href="/account">your account page</a>. Deleting removes your posts, your images
+    and your LinkedIn permission. It cannot be undone, and it is a real delete —
+    nothing is kept behind a flag.</p>
+  <p class="muted">Posts already published to LinkedIn stay on LinkedIn. Remove those there.</p>
+</div>
+{% endblock %}

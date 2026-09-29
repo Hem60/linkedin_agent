@@ -23,7 +23,7 @@
   </div>
 {% endif %}
 
-<form method="post" action="/new" class="card" id="compose">
+<form method="post" action="/new" class="card" id="compose">{{ csrf(request) }}
   <label for="topic">Topic</label>
   <input type="text" id="topic" name="topic" maxlength="500" required autofocus
          value="{{ form.topic or '' }}"

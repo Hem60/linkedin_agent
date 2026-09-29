@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Your account · PostPilot{% endblock %}
+{% block shell_class %}narrow{% endblock %}
+
+{% block content %}
+<div class="pagehead">
+  <div class="crumbs"><a href="/">Dashboard</a> / Account</div>
+  <h1>Your account</h1>
+  <p>{{ user.email }} · {{ post_count }} post{{ '' if post_count == 1 else 's' }}</p>
+</div>
+
+{% if message %}<div class="error" role="alert">{{ message }}</div>{% endif %}
+
+<div class="card">
+  <h2>Take your data with you</h2>
+  <p class="sub">Everything PostPilot holds about you, as one file: your profile,
+    every post, and where your images live. Your LinkedIn access token is not
+    included — it's a credential held on your behalf, not information about you.</p>
+  <a class="btn btn-ghost" href="/account/export">Download my data</a>
+</div>
+
+<div class="card">
+  <h2>Disconnect LinkedIn</h2>
+  <p class="sub">Signing out leaves everything here and ends this session. Your
+    LinkedIn permission stays until it expires or you delete your account.</p>
+  <a class="btn btn-ghost" href="/auth/logout">Sign out</a>
+</div>
+
+<div class="card">
+  <h2>Delete everything</h2>
+  <p class="sub">Removes your account, your {{ post_count }} post{{ '' if post_count == 1 else 's' }},
+    your images and your LinkedIn permission. This is a real delete, not a flag —
+    it cannot be undone.</p>
+  <p class="muted">Posts already published to LinkedIn stay on LinkedIn. Remove those there.</p>
+
+  <form method="post" action="/account/delete"
+        onsubmit="return confirm('Delete your account and everything in it? This cannot be undone.')">{{ csrf(request) }}
+    <label for="confirm">Type <b>DELETE</b> to confirm</label>
+    <input type="text" id="confirm" name="confirm" autocomplete="off" placeholder="DELETE">
+    <div style="margin-top:16px">
+      <button class="btn btn-danger" type="submit">Delete my account</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

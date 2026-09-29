@@ -8,7 +8,7 @@
     <h2>Tell us who you are</h2>
     <p class="sub">Asked once. Every post is written for this context, so it reads like you rather than like a template.</p>
 
-    <form method="post" action="/onboarding">
+    <form method="post" action="/onboarding">{{ csrf(request) }}
       <label>Account type</label>
       <div class="choice">
         <label>
