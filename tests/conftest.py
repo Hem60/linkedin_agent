@@ -45,8 +45,30 @@ def _guard(schema: str) -> None:
         )
 
 
+_needs_database = False
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_collection_modifyitems(items):
+    """Note whether this run actually touches the database.
+
+    Without this, `pytest -m "not integration"` still paid for a migration and a
+    live connection, so the unit tests could not run offline at all -- which is
+    most of the value of having them separate.
+
+    trylast matters: `-m` deselection happens in this same hook, so running
+    first would still see the integration tests and connect anyway.
+    """
+    global _needs_database
+    _needs_database = any("integration" in item.keywords for item in items)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def isolated_database():
+    if not _needs_database:
+        yield
+        return
+
     from app.config import get_settings
 
     settings = get_settings()
