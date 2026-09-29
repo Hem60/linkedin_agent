@@ -86,11 +86,18 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             return _refused(request)
 
         expected = request.session.get(SESSION_KEY)
-        supplied = request.headers.get(HEADER)
+        # An empty header counts as no header: only a real value should stop
+        # us looking in the body, where a browser actually puts the token.
+        supplied = request.headers.get(HEADER) or None
+
         if supplied is None and "form" in (request.headers.get("content-type") or ""):
-            # Reading the body here is safe: Starlette caches it, so the route
-            # still receives its form.
-            form = await request.form()
+            # Reading the body here would normally consume the request stream,
+            # leaving the route with an empty form and every field "missing".
+            # BaseHTTPMiddleware guards against exactly that: once .body() has
+            # been awaited it replays the cached bytes downstream. So read the
+            # body first, and only then parse it.
+            await request.body()
+            form = await request.form()          # parses the cached body
             supplied = form.get(FIELD)
 
         if not expected or not supplied or not secrets.compare_digest(str(supplied), expected):
