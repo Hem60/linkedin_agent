@@ -178,3 +178,60 @@ page will be built on.
 `DRY_RUN=true` is the default and means nothing is published to LinkedIn: posts
 are built, sanitized and stored, but the API call is skipped. Turn it off only
 when you intend to post under a real name.
+
+## Deploy
+
+`render.yaml` is a Render Blueprint for one free web service that also runs the
+publishing worker inside itself (plan section 14, option 1).
+
+1. Push to `main`, then in Render: **New → Blueprint**, point it at this repo.
+2. Fill in the secrets it asks for. **Copy `ENCRYPTION_KEY` from your existing
+   `.env`** — it decrypts the LinkedIn tokens already in the database, and a
+   fresh key orphans every one of them silently, forcing all users to reconnect.
+3. Set `APP_URL` to the service's real URL once Render assigns it.
+4. Add `<APP_URL>/auth/callback` to the LinkedIn app's authorised redirect URLs.
+   It must match exactly, including the scheme — LinkedIn compares the string.
+5. Point a cron pinger at `<APP_URL>/healthz` every 10 minutes.
+
+Migrations run in the build command, so each deploy brings the schema to head
+before the new code serves traffic.
+
+### Why the pinger is not optional
+
+A free Render service sleeps after roughly fifteen minutes idle, and a sleeping
+process publishes nothing — scheduled posts fire late, or not until something
+wakes it.
+
+`/healthz` makes a real database round trip, so the same ping also keeps the
+Supabase project from pausing after seven idle days. That is not hypothetical:
+it is what took this app down on 9 Oct 2026, and a ping that only touched the
+web process would not have prevented it.
+
+Scheduled posts can still be a few minutes late on the free tier. That is the
+trade until scheduling is worth paying for.
+
+The pinger prevents a pause; it cannot undo one. A paused Supabase project has
+to be restored by hand from the dashboard — queries do not wake it.
+
+### /healthz answers 200 even when the database is down
+
+Deliberately. It reports the database in the body (`"database": "down"`) rather
+than in the status code, because Render treats a failing health check as a
+failed deploy. If it returned 503 while Supabase was paused, deploys would fail
+for the one reason a deploy cannot fix, and the service would restart-loop
+instead of staying up to serve the pages that do not need a database.
+
+Alert on the body, not the status.
+
+### Moving to a real worker
+
+Set `RUN_SCHEDULER=false` on the web service and uncomment the worker service in
+`render.yaml` (about $7/month). It does not sleep, so posts go out on time.
+
+The switch needs no downtime or coordination: claims use
+`SELECT ... FOR UPDATE SKIP LOCKED` (F22), so running the in-process scheduler
+and a separate worker at the same time is safe — neither can publish a post the
+other has claimed.
+
+Keep the pinger anyway. A worker that never sleeps still has nothing to publish
+to if Supabase has paused the database.

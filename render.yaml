@@ -1,0 +1,133 @@
+# Render Blueprint -- plan.md section 14, option 1.
+#
+# One free web service that also runs the publishing worker inside itself. A
+# free service sleeps after about fifteen minutes idle, and a sleeping process
+# publishes nothing, so an external cron pinger hits /healthz to keep it awake.
+# Scheduled posts can therefore fire a few minutes late; that is the trade the
+# plan accepts until scheduling is worth $7 a month.
+#
+# /healthz makes a real database round trip, so the same ping also keeps the
+# Supabase project from pausing after seven idle days -- which is exactly what
+# took this app down on 9 Oct 2026. A ping that only touched the web process
+# would not have.
+#
+# To upgrade to a real worker later: set RUN_SCHEDULER=false below, uncomment
+# the worker service, and give it the same environment. Running both at once is
+# safe -- claims use SELECT ... FOR UPDATE SKIP LOCKED (F22) -- so the switch
+# needs no downtime and no coordination.
+
+services:
+  - type: web
+    name: postpilot
+    runtime: python
+    plan: free
+    region: singapore          # same region as the Supabase project
+    branch: main
+    healthCheckPath: /healthz
+
+    # Migrations run here rather than in a preDeployCommand, which is a paid
+    # feature. Build-time environment variables are available, so alembic can
+    # reach the database.
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+
+    envVars:
+      # --- Secrets: set in the Render dashboard, never in this file ---------
+      # ENCRYPTION_KEY must be copied from the existing .env, not generated.
+      # It decrypts the LinkedIn tokens already in the database; a new key
+      # silently orphans every stored token and every user has to reconnect.
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: LINKEDIN_CLIENT_ID
+        sync: false
+      - key: LINKEDIN_CLIENT_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: PEXELS_API_KEY
+        sync: false
+      - key: STORAGE_URL
+        sync: false
+      - key: STORAGE_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+
+      # Sessions are cookies we sign; losing the old value only signs people
+      # out, so Render may generate this one.
+      - key: SESSION_SECRET
+        generateValue: true
+
+      # --- Settings ---------------------------------------------------------
+      # APP_URL must match the service's real URL exactly: it is the OAuth
+      # redirect LinkedIn validates against, and the origin CSRF compares to.
+      - key: APP_URL
+        value: https://postpilot.onrender.com
+      - key: LINKEDIN_API_VERSION
+        value: "202609"
+      - key: STORAGE_BUCKET
+        value: post-images
+      - key: EMAIL_FROM
+        value: PostPilot <onboarding@resend.dev>
+
+      # The web process is the worker. Set false only when the worker service
+      # below is running instead.
+      - key: RUN_SCHEDULER
+        value: "true"
+
+      # Publishing is live in production. DRY_RUN exists for local work.
+      - key: DRY_RUN
+        value: "false"
+
+      - key: DAILY_POST_LIMIT
+        value: "3"
+      - key: DAILY_REWRITE_LIMIT
+        value: "10"
+      - key: GEMINI_COOLDOWN_MINUTES
+        value: "30"
+
+      # Tags every Sentry event. Left at its default, production errors arrive
+      # labelled "development" and are indistinguishable from local ones.
+      - key: ENVIRONMENT
+        value: production
+
+      # Pinned rather than left to the code defaults, so a model can be swapped
+      # from the dashboard when one is deprecated or starts rate-limiting --
+      # without a code change and a redeploy.
+      - key: GEMINI_MODEL
+        value: gemini-3.6-flash
+      - key: GEMINI_FALLBACK_MODEL
+        value: gemini-3.5-flash-lite
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: MODEL_TIMEOUT_SECONDS
+        value: "45"
+
+      - key: PYTHON_VERSION
+        value: "3.13.7"
+
+# --- The paid worker, for when scheduling matters more than $7 --------------
+#
+#  - type: worker
+#    name: postpilot-worker
+#    runtime: python
+#    plan: starter
+#    region: singapore
+#    branch: main
+#    buildCommand: pip install -r requirements.txt
+#    startCommand: python -m worker.scheduler
+#    envVars:
+#      - fromGroup: postpilot-env      # share the web service's variables
+#
+# Then set RUN_SCHEDULER=false on the web service. A worker does not sleep, so
+# the cron pinger becomes optional for publishing -- but keep it anyway, or
+# Supabase pauses the database after seven idle days and the worker has nothing
+# to publish to.
