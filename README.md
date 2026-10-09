@@ -184,7 +184,7 @@ when you intend to post under a real name.
 `render.yaml` is a Render Blueprint for one free web service that also runs the
 publishing worker inside itself (plan section 14, option 1).
 
-1. Push to `main`, then in Render: **New → Blueprint**, point it at this repo.
+1. Push to `master`, then in Render: **New → Blueprint**, point it at this repo.
 2. Fill in the secrets it asks for. **Copy `ENCRYPTION_KEY` from your existing
    `.env`** — it decrypts the LinkedIn tokens already in the database, and a
    fresh key orphans every one of them silently, forcing all users to reconnect.

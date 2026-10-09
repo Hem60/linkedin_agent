@@ -22,7 +22,7 @@ services:
     runtime: python
     plan: free
     region: singapore          # same region as the Supabase project
-    branch: main
+    branch: master
     healthCheckPath: /healthz
 
     # Migrations run here rather than in a preDeployCommand, which is a paid
@@ -121,7 +121,7 @@ services:
 #    runtime: python
 #    plan: starter
 #    region: singapore
-#    branch: main
+#    branch: master
 #    buildCommand: pip install -r requirements.txt
 #    startCommand: python -m worker.scheduler
 #    envVars:
