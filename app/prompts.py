@@ -163,8 +163,13 @@ Reply with JSON only. No prose before or after, no code fences.
 
 Exactly three drafts. They must differ in approach, not merely in wording --
 different hook, different angle, different structure within the type.
-Hashtags without the "#" symbol. Scores are your honest assessment out of 10,
-so vary them; three identical scores tell the writer nothing.
+Hashtags without the "#" symbol, and capitalised per word -- MachineLearning,
+not machinelearning. LinkedIn matches them either way but displays them as
+written, and a run-together lowercase tag is hard to read. Keep the casing a
+term is normally written in: MLOps and RAG, not Mlops and Rag.
+
+Scores are your honest assessment out of 10, so vary them; three identical
+scores tell the writer nothing.
 """
 
 
