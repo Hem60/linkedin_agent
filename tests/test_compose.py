@@ -217,7 +217,7 @@ def someone_elses_post(monkeypatch, db) -> int:
     return pid
 
 
-@pytest.mark.parametrize("method,path,data", [
+ROUTES_TAKING_A_POST = [
     ("get", "/posts/{id}", None),
     ("get", "/posts/{id}/drafts", None),
     ("post", "/posts/{id}", {"content": "hijacked", "hashtags": ""}),
@@ -225,13 +225,23 @@ def someone_elses_post(monkeypatch, db) -> int:
     ("post", "/posts/{id}/publish", None),
     ("post", "/posts/{id}/delete", None),
     ("post", "/posts/{id}/image/remove", None),
-])
-def test_another_users_post_is_invisible(client, someone_elses_post, db,
-                                         method, path, data):
-    """404, not 403: a 403 would confirm the id exists."""
-    url = path.format(id=someone_elses_post)
-    r = getattr(client, method)(url, data=data) if data else getattr(client, method)(url)
-    assert r.status_code == 404
+]
+
+
+def test_another_users_post_is_invisible(client, someone_elses_post, db):
+    """404, not 403: a 403 would confirm the id exists.
+
+    One test walking the routes rather than a parametrised case each. Every
+    case needs two sign-ins and a generated post to arrange, and none of them
+    changes anything -- the whole point is that they all 404 and the post
+    survives untouched -- so rebuilding that seven more times bought nothing
+    and cost about half a minute against a remote database. The same shape as
+    test_privacy.py's walk over every registered post route.
+    """
+    for method, path, data in ROUTES_TAKING_A_POST:
+        url = path.format(id=someone_elses_post)
+        r = getattr(client, method)(url, data=data) if data else getattr(client, method)(url)
+        assert r.status_code == 404, f"{method.upper()} {path} returned {r.status_code}"
 
     db.expire_all()
     post = db.get(Post, someone_elses_post)
@@ -254,21 +264,33 @@ def test_signed_out_requests_are_refused():
 # What the browser is trusted with
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("url", [
+URLS_THE_SERVER_MUST_REFUSE = [
     "http://169.254.169.254/latest/meta-data/",      # cloud metadata endpoint
     "http://localhost:8000/healthz",
     "https://evil.example.com/x.jpg",
     "http://images.pexels.com/photos/1.jpg",         # right host, wrong scheme
     "https://images.pexels.com.evil.com/x.jpg",      # look-alike host
     "file:///etc/passwd",
-])
-def test_the_server_will_not_fetch_arbitrary_urls(client, monkeypatch, url):
+]
+
+
+def test_the_server_will_not_fetch_arbitrary_urls(client, monkeypatch):
     """The photo URL arrives from the browser. Fetching whatever it says would
-    let any signed-in user make the server request internal addresses."""
-    monkeypatch.setattr(storage, "fetch", lambda *a, **k: pytest.fail(f"fetched {url}"))
+    let any signed-in user make the server request internal addresses.
+
+    One post for all six, rather than a sign-in and a generated draft each:
+    every one is refused before anything is fetched, so there is no state for
+    them to share badly.
+    """
+    fetched: list[str] = []
+    monkeypatch.setattr(storage, "fetch", lambda *a, **k: fetched.append(a[0] if a else "?"))
     pid = create(client)
-    r = client.post(f"/posts/{pid}/image/pexels", data={"url": url})
-    assert r.status_code == 400
+
+    for url in URLS_THE_SERVER_MUST_REFUSE:
+        r = client.post(f"/posts/{pid}/image/pexels", data={"url": url})
+        assert r.status_code == 400, f"{url} returned {r.status_code}"
+
+    assert fetched == [], f"the server fetched {fetched}"
 
 
 def test_a_genuine_pexels_url_is_accepted(client, db, monkeypatch):

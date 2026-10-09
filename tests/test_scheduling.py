@@ -318,13 +318,16 @@ def test_scheduled_time_shows_in_history(client, db):
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("path", ["/schedule", "/unschedule"])
-def test_someone_elses_post_cannot_be_scheduled(client, monkeypatch, db, path):
+def test_someone_elses_post_cannot_be_scheduled(client, monkeypatch, db):
+    """Both routes against one arrangement: neither changes anything, so the
+    second sign-in and draft the parametrised version built were wasted."""
     other = _client(monkeypatch, OTHER)
     pid = _draft(db, OTHER)
     other.post(f"/posts/{pid}/schedule", data={"when": _future()})
-    r = client.post(f"/posts/{pid}{path}", data={"when": _future(9)})
-    assert r.status_code == 404
+
+    for path in ("/schedule", "/unschedule"):
+        r = client.post(f"/posts/{pid}{path}", data={"when": _future(9)})
+        assert r.status_code == 404, f"{path} returned {r.status_code}"
 
 
 # ---------------------------------------------------------------------------
