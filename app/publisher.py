@@ -155,6 +155,12 @@ def publish(db: Session, post: Post) -> Post:
 
     except linkedin.LinkedInError as exc:
         _record_failure(db, post, str(exc), retryable=exc.retryable)
+        if exc.status == 401:
+            # Record it on the account, not only on the post. Otherwise the
+            # dashboard goes on reporting a healthy connection and the next
+            # scheduled post fails the same way, with nothing telling the
+            # member the one thing that would fix it.
+            _mark_token_rejected(db, user.id)
         raise PublishError(str(exc)) from exc
     except Exception as exc:  # noqa: BLE001 -- a claimed post must never be left stuck
         _record_failure(db, post, f"{type(exc).__name__}: {exc}", retryable=True)
@@ -173,10 +179,35 @@ def publish_now(db: Session, post_id: int) -> Post:
 # Pieces
 # ---------------------------------------------------------------------------
 
+def _mark_token_rejected(db: Session, user_id: int) -> None:
+    """Remember that LinkedIn refused this token.
+
+    Runs after _record_failure, which rolls back: setting it any earlier would
+    be discarded. Guarded, because this is housekeeping inside an `except` and
+    must never replace the publishing error the caller is about to raise.
+    """
+    try:
+        user = db.get(User, user_id)
+        if user and user.token_rejected_at is None:
+            user.token_rejected_at = _now()
+            db.commit()
+            log.warning("user %d: LinkedIn refused the token; connection marked dead",
+                        user_id)
+    except Exception:  # noqa: BLE001
+        log.exception("could not mark the token rejected for user %d", user_id)
+        db.rollback()
+
+
 def _token_for(user: User) -> str:
     if not user.access_token:
         raise linkedin.LinkedInError(
             "No LinkedIn connection. Sign in again to publish.", retryable=False
+        )
+    if user.token_rejected_at is not None:
+        # Known dead: do not spend a request finding out again.
+        raise linkedin.LinkedInError(
+            "Your LinkedIn connection was refused. Reconnect to publish again.",
+            status=401, retryable=False,
         )
     if user.token_expires_at and user.token_expires_at <= _now():
         raise linkedin.LinkedInError(

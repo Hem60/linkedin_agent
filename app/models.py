@@ -117,6 +117,12 @@ class User(Base):
     # Fernet ciphertext, never plaintext (plan section 13).
     access_token: Mapped[Optional[str]] = mapped_column(Text)
     token_expires_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
+    # When LinkedIn last refused this token with a 401. A token can die long
+    # before the 60 days are up -- a password change or revoking the app kills
+    # it immediately -- and nothing in the expiry date reflects that. Without
+    # this the dashboard keeps reporting a healthy connection while every
+    # scheduled post fails one at a time. Cleared on reconnect.
+    token_rejected_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
 
     # Personal context, used to write in the member's voice.
     role_title: Mapped[str] = mapped_column(String(200), nullable=False, default="")

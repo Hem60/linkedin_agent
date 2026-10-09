@@ -54,6 +54,10 @@ class Usage:
 
     @property
     def at_limit(self) -> bool:
+        # 0 means unlimited, the same as in take_post. Without this the page
+        # announces "you've used today's 0 posts" to someone who has no limit.
+        if self.post_limit <= 0:
+            return False
         return self.posts >= self.post_limit
 
 

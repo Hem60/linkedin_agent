@@ -103,8 +103,20 @@ def require_user(user: User | None = Depends(current_user)) -> User:
     return user
 
 
+def token_is_dead(user: User) -> bool:
+    """LinkedIn has already refused this token, whatever the expiry date says.
+
+    A token does not only die of old age: a password change, a sign-out
+    everywhere, or revoking the app kills it at once, and the expiry we stored
+    at sign-in knows nothing about it.
+    """
+    return user.token_rejected_at is not None
+
+
 def token_is_expiring(user: User, within_days: int = 7) -> bool:
     """F5: warn before the token dies, because reconnecting is manual."""
+    if token_is_dead(user):
+        return True
     if user.token_expires_at is None:
         return True
     remaining = user.token_expires_at - dt.datetime.now(dt.timezone.utc)
@@ -235,6 +247,9 @@ def upsert_user(
     # A fresh token means the old expiry warning is spent; clearing it lets the
     # next lapse warn again in two months' time.
     user.expiry_notified_at = None
+    # Reconnecting is exactly the cure for a refused token, so stop reporting
+    # the connection as dead.
+    user.token_rejected_at = None
 
     db.commit()
     db.refresh(user)

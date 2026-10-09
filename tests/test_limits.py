@@ -300,7 +300,12 @@ def _fake_generation(*a, **k):
 
 @pytest.mark.integration
 def test_the_form_shows_what_is_left(db, monkeypatch):
+    # Pin the limit rather than inheriting whatever .env happens to say. This
+    # test passed for months only because the developer's limit was non-zero;
+    # setting DAILY_POST_LIMIT=0 turned the counter off and broke it, which is
+    # the environment talking, not the code.
     client = _signed_in(monkeypatch)
+    _limit(monkeypatch, 3)
     assert "left today" in client.get("/new").text
 
 
@@ -445,3 +450,44 @@ def test_reconnecting_clears_the_warning(db, monkeypatch):
     _signed_in(monkeypatch)          # sign in again
     db.expire_all()
     assert _db_user(db).expiry_notified_at is None
+
+
+# ---------------------------------------------------------------------------
+# Turning the limit off
+# ---------------------------------------------------------------------------
+
+def test_no_limit_never_reports_being_at_the_limit():
+    """0 means unlimited. The naive `posts >= limit` is true for every count
+    against 0, so the compose page told people with no limit that they had
+    used today's 0 posts."""
+    assert not limits.Usage(posts=0, rewrites=0, post_limit=0).at_limit
+    assert not limits.Usage(posts=99, rewrites=0, post_limit=0).at_limit
+
+
+def test_a_real_limit_still_reports_being_at_it():
+    assert not limits.Usage(posts=2, rewrites=0, post_limit=3).at_limit
+    assert limits.Usage(posts=3, rewrites=0, post_limit=3).at_limit
+    assert limits.Usage(posts=4, rewrites=0, post_limit=3).at_limit
+
+
+@pytest.mark.integration
+def test_taking_posts_is_never_refused_when_the_limit_is_off(db, monkeypatch):
+    """The end that matters: the allowance is simply not consulted."""
+    _signed_in(monkeypatch)
+    user = _db_user(db)
+    _limit(monkeypatch, 0)
+
+    for _ in range(25):
+        limits.take_post(db, user)
+    assert not limits.current(db, user).at_limit
+
+
+@pytest.mark.integration
+def test_the_compose_page_shows_no_limit_notice_when_it_is_off(db, monkeypatch):
+    """The bug this was found through: the page announced a limit of 0."""
+    client = _signed_in(monkeypatch)
+    _limit(monkeypatch, 0)
+
+    page = client.get("/new").text
+    assert "left today" not in page
+    assert "used today's" not in page

@@ -178,6 +178,10 @@ def index(
                 counts[key] = n
         if user.token_expires_at:
             days_left = (user.token_expires_at - dt.datetime.now(dt.timezone.utc)).days
+        if auth.token_is_dead(user):
+            # LinkedIn has already refused it. The stored expiry is meaningless
+            # now, and showing "50 days left" would be a straight lie.
+            days_left = 0
 
     return templates.TemplateResponse(
         request,
@@ -188,6 +192,7 @@ def index(
             "counts": counts,
             "days_left": days_left,
             "token_expiring": bool(user) and token_is_expiring(user),
+            "token_rejected": bool(user) and auth.token_is_dead(user),
             "awaiting": awaiting,
             "message": request.query_params.get("m"),
         },

@@ -229,7 +229,12 @@
   <div class="notice" style="margin-top:20px">
     <span aria-hidden="true">⚠</span>
     <div>
-      Your LinkedIn connection {% if days_left is not none and days_left > 0 %}expires in {{ days_left }} days{% else %}has expired{% endif %}.
+      {% if token_rejected %}
+        LinkedIn has refused your connection — this happens when the app is removed
+        or the password changes, and it does not wait for the 60 days to run out.
+      {% else %}
+        Your LinkedIn connection {% if days_left is not none and days_left > 0 %}expires in {{ days_left }} days{% else %}has expired{% endif %}.
+      {% endif %}
       <a href="/auth/login">Reconnect</a> to keep scheduled posts working.
     </div>
   </div>
@@ -311,7 +316,9 @@
     <div style="flex:1 1 260px;min-width:0">
       <h3>LinkedIn connection</h3>
       <p>
-        {% if days_left is not none and days_left > 0 %}
+        {% if token_rejected %}
+          Refused by LinkedIn. Reconnect to publish again — nothing will go out until you do.
+        {% elif days_left is not none and days_left > 0 %}
           Active — {{ days_left }} days left. LinkedIn caps this at 60 and issues no refresh token,
           so reconnecting is a normal part of using the app.
         {% else %}

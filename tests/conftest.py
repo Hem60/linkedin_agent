@@ -30,6 +30,11 @@ os.environ["DB_SCHEMA"] = TEST_SCHEMA
 os.environ["DRY_RUN"] = "true"
 # The worker must not tick in the background while tests arrange data.
 os.environ["RUN_SCHEDULER"] = "false"
+# Pin the allowance too, for the same reason as the two above: the suite must
+# not depend on whoever ran it. Setting DAILY_POST_LIMIT=0 in a real .env --
+# a supported way to turn the limit off -- silently broke a test that asserted
+# the compose page shows what is left. Tests needing another value patch it.
+os.environ["DAILY_POST_LIMIT"] = "3"
 
 import pytest  # noqa: E402
 
