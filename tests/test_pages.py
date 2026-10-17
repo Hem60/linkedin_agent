@@ -187,3 +187,35 @@ def test_the_header_shows_the_account_as_one_object(signed_in):
     assert 'class="account"' in r.text
     assert 'class="avatar-xs"' in r.text
     assert 'class="signout"' in r.text
+
+
+@pytest.mark.parametrize("path", ["/", "/new", "/posts", "/account"])
+def test_the_header_is_not_inside_the_page_column(signed_in, path):
+    """The bar used to live inside .shell, so .narrow (640px) governed it on
+    every page except the dashboard: it had 600px to seat ~650px of brand, nav
+    and account and wrapped to two rows at *every* viewport width. No
+    breakpoint could have fixed that, which is why this is a structural test
+    and not a width one."""
+    body = signed_in.get(path).text
+    header, shell = body.index('<header class="topbar">'), body.index('<div class="shell')
+    assert header < shell, f"{path}: header must come before the page column"
+    assert '</header>' in body
+    assert body.index('</header>') < shell, f"{path}: header must close before .shell opens"
+
+
+def test_the_narrow_column_never_wraps_the_header():
+    """.narrow is the article measure. Applying it to page furniture is what
+    broke the bar, so the two must not share an element."""
+    css = Path("app/static/app.css").read_text(encoding="utf-8")
+    assert ".narrow .topbar" not in css
+    assert ".topbar-inner {" in css, "the bar keeps its own measure"
+
+
+def test_a_long_name_cannot_push_the_header_onto_two_rows(signed_in):
+    """LinkedIn supplies whatever the member typed, so the name truncates
+    rather than silently widening the bar past its one-row budget."""
+    css = Path("app/static/app.css").read_text(encoding="utf-8")
+    rule = re.search(r"\.account-name \{([^}]*)\}", css)
+    assert rule, "the account name needs a width rule"
+    assert "text-overflow: ellipsis" in rule.group(1)
+    assert "max-width" in rule.group(1)

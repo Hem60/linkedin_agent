@@ -10,9 +10,8 @@
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-<div class="shell {% block shell_class %}{% endblock %}">
-
-  <div class="topbar">
+<header class="topbar">
+  <div class="topbar-inner">
     <a class="brand" href="/" style="color:inherit">
       <span class="mark" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 13 22 3l-7.2 19-3.6-7.1z"/></svg>
@@ -46,6 +45,9 @@
     </div>
     {% endif %}
   </div>
+</header>
+
+<div class="shell {% block shell_class %}{% endblock %}">
 
   <main id="main">
     {% block content %}{% endblock %}
