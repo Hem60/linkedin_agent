@@ -9,8 +9,14 @@ Phase 0 feasibility work.
 | Phase | State |
 |---|---|
 | 0 — Feasibility spike | ✅ passed, results in plan.md §2 |
-| 1 — Setup | ✅ this commit |
-| 2 — Data model | next |
+| 1–2 — Setup, data model | ✅ |
+| 3 — Sign in, onboarding, front end | ✅ |
+| 4–6 — Drafting, Groq fallback, sanitizer | ✅ |
+| 7–8 — Images, storage, publishing | ✅ |
+| 9–10 — Browser flow, scheduling worker | ✅ |
+| 11–12 — Limits, email, admin, business mode | ✅ |
+| 13–14 — CSRF, deletion, export, feedback | ✅ |
+| 15–16 — Polish, Render blueprint | ✅ |
 
 ## Setup
 
@@ -59,7 +65,7 @@ uvicorn app.main:app --reload
 ```
 
 - `GET /healthz` — liveness plus a real database round trip
-- `GET /` — placeholder
+- `GET /` — the dashboard when signed in, otherwise the landing page
 
 ## Tests
 
