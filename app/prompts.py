@@ -24,7 +24,11 @@ STYLE_RULES = """\
 How to write:
 - Open with a hook under 12 words. No throat-clearing, no "In today's world".
 - Paragraphs of one or two lines, blank line between them.
-- Three or four concrete, practical points. Specifics beat adjectives.
+- Five or six concrete, practical points. Specifics beat adjectives.
+- Give each point a sentence of reasoning, not just the instruction. "Keep the
+  backbone precision higher" is a tip; saying why low-bit precision loses the
+  gradient signal is worth reading. That reasoning is where the length comes
+  from -- never from restating a point in different words.
 - Professional but human. No buzzwords, no "game-changer", no "excited to share".
 - Close with a genuine question that invites a reply.
 - Do not use markdown. No **bold**, no headings, no bullet characters like "-" or "*".
@@ -168,6 +172,15 @@ not machinelearning. LinkedIn matches them either way but displays them as
 written, and a run-together lowercase tag is hard to read. Keep the casing a
 term is normally written in: MLOps and RAG, not Mlops and Rag.
 
+Use tags people actually follow, not ones you coined for this post. A hashtag
+nobody searches reaches nobody, and an invented one looks like a typo. Mix
+two or three broad tags that have a real following (MachineLearning, DevOps,
+ProductManagement) with specific ones for the topic (QLoRA, RAG, Kubernetes).
+One word each, letters and digits only -- no spaces, punctuation, emoji or
+accents, since LinkedIn silently drops a tag it cannot parse. Every tag must
+relate to the post; padding the list with unrelated popular tags is what gets
+a post treated as spam.
+
 Scores are your honest assessment out of 10, so vary them; three identical
 scores tell the writer nothing.
 """
@@ -192,11 +205,16 @@ def _writer_context(user: User) -> str:
 
 
 def hashtag_range(user: User, category: PostCategory) -> tuple[int, int]:
-    """3-5 personal, 8-10 business. The original plan allowed up to 30, which
-    suppresses reach rather than extending it."""
+    """5-8 personal, 8-10 business.
+
+    Personal was 3-5. Raised on request for more discovery surface, and kept
+    well under the thirty the original plan allowed: past roughly a dozen,
+    LinkedIn reads the post as tag-stuffing and reach falls rather than rises.
+    Eight is the ceiling that buys coverage without crossing that line.
+    """
     if category is PostCategory.business or user.account_type is AccountType.business:
         return (8, 10)
-    return (3, 5)
+    return (5, 8)
 
 
 def build_prompt(
@@ -235,7 +253,11 @@ Tone: {TONES[tone]}
 
 Hashtags: {lo} to {hi} of them. {spec.hashtags}
 
-Length: whatever the topic deserves. Under 3000 characters including hashtags.
-A tight 700-character post beats a padded 2000-character one.
+Length: aim for 1200 to 1800 characters including hashtags, and never exceed
+3000. That is room for a real opening, five or six developed points with the
+reasoning behind them, and a close -- not the same short post stretched out.
+Earn the length with substance: what you tried, what broke, what you measured,
+what you would do differently. If the topic genuinely cannot carry 1200
+characters, write a shorter post rather than inventing material to reach it.
 
 {JSON_CONTRACT}"""

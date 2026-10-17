@@ -91,10 +91,17 @@ def test_brand_posts_get_more_hashtags_but_nowhere_near_thirty():
     assert "Thirty hashtags reduces reach" in p
 
 
-def test_a_personal_account_still_gets_the_narrow_range():
+def test_a_personal_account_gets_fewer_hashtags_than_a_brand_one():
+    """5-8, raised from 3-5. Still below the brand range, and far below the
+    dozen or so at which LinkedIn starts reading a post as tag-stuffing."""
     personal = _brand_user()
     personal.account_type = AccountType.personal
-    assert hashtag_range(personal, PostCategory.learning) == (3, 5)
+    assert hashtag_range(personal, PostCategory.learning) == (5, 8)
+
+    lo, hi = hashtag_range(personal, PostCategory.learning)
+    brand_lo, brand_hi = hashtag_range(_brand_user(), PostCategory.business)
+    assert hi <= brand_hi, "a personal post should not out-tag a brand post"
+    assert hi <= 12, "past about a dozen, more tags cost reach rather than buying it"
 
 
 def test_what_gets_copied_is_the_plain_text_not_the_escaped_form():

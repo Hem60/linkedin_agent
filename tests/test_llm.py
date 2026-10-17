@@ -371,7 +371,7 @@ def test_prompt_forbids_markdown():
 
 
 def test_business_accounts_get_the_wider_hashtag_range():
-    assert hashtag_range(_user(), PostCategory.learning) == (3, 5)
+    assert hashtag_range(_user(), PostCategory.learning) == (5, 8)
     assert hashtag_range(_user(account_type=AccountType.business),
                          PostCategory.business) == (8, 10)
 
@@ -394,3 +394,37 @@ def test_an_answered_extra_question_is_included():
     p = build_prompt(_user(), "shipped it", PostCategory.project, Tone.direct,
                      extra_answer="github.com/hem/postpilot")
     assert "github.com/hem/postpilot" in p
+
+
+# ---------------------------------------------------------------------------
+# Length and hashtag targets
+# ---------------------------------------------------------------------------
+
+def test_the_prompt_asks_for_a_substantial_post():
+    """Posts were coming back at 450-750 characters against a 3000 limit,
+    because the prompt said a tight 700-character post beat a padded 2000 one.
+    It now names a target instead."""
+    p = build_prompt(_user(), "quantisation", PostCategory.learning, Tone.direct)
+    assert "1200 to 1800 characters" in p
+    assert "3000" in p
+    assert "700-character post beats" not in p, "the old short-post steer is back"
+
+
+def test_the_prompt_still_refuses_to_pad():
+    """The length target must not become a licence to invent. This is the one
+    guard that stops a thin topic becoming 1800 characters of fiction."""
+    p = build_prompt(_user(), "quantisation", PostCategory.learning, Tone.direct)
+    assert "rather than inventing material to reach it" in p
+    assert "Do not invent facts" in p
+
+
+def test_a_personal_prompt_now_asks_for_five_to_eight_hashtags():
+    p = build_prompt(_user(), "quantisation", PostCategory.learning, Tone.direct)
+    assert "5 to 8" in p
+
+
+def test_the_prompt_rules_out_hashtags_nobody_follows():
+    """An invented tag reaches nobody and reads as a typo."""
+    p = build_prompt(_user(), "quantisation", PostCategory.learning, Tone.direct)
+    assert "not ones you coined for this post" in p
+    assert "letters and digits only" in p
