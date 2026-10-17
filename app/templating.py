@@ -30,6 +30,23 @@ def is_admin(user: User | None) -> bool:
 templates.env.globals["is_admin"] = is_admin
 
 
+def initials(name: str) -> str:
+    """One or two letters for the header avatar.
+
+    Falls back to a dot rather than an empty circle: LinkedIn does not promise
+    a name, and a blank avatar looks like a loading state that never resolves.
+    """
+    parts = [p for p in (name or "").split() if p]
+    if not parts:
+        return "·"
+    if len(parts) == 1:
+        return parts[0][:2].upper()
+    return (parts[0][0] + parts[-1][0]).upper()
+
+
+templates.env.globals["initials"] = initials
+
+
 _CSS = Path("app/static/app.css")
 _asset_cache: tuple[float, str] | None = None
 

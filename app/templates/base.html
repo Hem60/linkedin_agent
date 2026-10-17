@@ -28,10 +28,16 @@
       <a href="/posts" {% if path.startswith('/posts') %}class="on" aria-current="page"{% endif %}>Posts</a>
     </nav>
     <div class="whoami">
-      <a class="name" href="/account"
-         {% if path.startswith('/account') %}aria-current="page"{% endif %}>{{ user.name }}</a>
-      {% if is_admin(user) %}<a href="/admin">Usage</a>{% endif %}
-      <a href="/auth/logout">Sign out</a>
+      {% if is_admin(user) %}
+      <a class="navlink" href="/admin"
+         {% if path.startswith('/admin') %}aria-current="page"{% endif %}>Usage</a>
+      {% endif %}
+      <a class="account" href="/account"
+         {% if path.startswith('/account') %}aria-current="page"{% endif %}>
+        <span class="avatar-xs" aria-hidden="true">{{ initials(user.name) }}</span>
+        <span class="account-name">{{ user.name }}</span>
+      </a>
+      <a class="signout" href="/auth/logout">Sign out</a>
     </div>
     {% else %}
     {# A visitor who scrolls past the hero had nothing to click until now. #}

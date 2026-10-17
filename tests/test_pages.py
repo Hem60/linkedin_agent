@@ -163,3 +163,27 @@ def test_the_signed_out_header_offers_a_way_in():
     r = client.get("/")
     assert 'href="/auth/login"' in r.text
     assert 'aria-label="Main"' not in r.text, "nav must not show to signed-out visitors"
+
+
+def test_initials_for_the_header_avatar():
+    from app.templating import initials
+    assert initials("Hem Patel") == "HP"
+    assert initials("Hem Kumar Patel") == "HP", "first and last, not the middle"
+    assert initials("Cher") == "CH", "one name still fills the circle"
+    assert initials("  spaced   out  ") == "SO"
+
+
+def test_initials_never_leave_the_avatar_empty():
+    """LinkedIn does not promise a name. A blank circle reads as a loading
+    state that never resolves."""
+    from app.templating import initials
+    for empty in ("", "   ", None):
+        assert initials(empty) == "·"
+
+
+def test_the_header_shows_the_account_as_one_object(signed_in):
+    """It was three bare links in three different styles beside styled pills."""
+    r = signed_in.get("/")
+    assert 'class="account"' in r.text
+    assert 'class="avatar-xs"' in r.text
+    assert 'class="signout"' in r.text

@@ -127,7 +127,9 @@ body::before {
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
   .topbar { -webkit-backdrop-filter: blur(14px) saturate(1.5); backdrop-filter: blur(14px) saturate(1.5); }
 }
-.topbar:hover { border-bottom-color: var(--line-2); }
+/* A persistent hairline, not one that appears on hover. Without it the bar
+   floated: nothing separated it from the page scrolling underneath. */
+.topbar { border-bottom-color: var(--line-2); }
 
 /* ---------- main navigation ----------
    There was none. Every page showed a logo and a sign-out link, so reaching
@@ -156,7 +158,44 @@ body::before {
 .brand .mark svg { width: 17px; height: 17px; display: block; }
 /* margin-left:auto so it still sits right when there is no nav beside it --
    the signed-out header has only a brand and a sign-in button. */
-.whoami { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--muted); margin-left: auto; }
+.whoami { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); margin-left: auto; }
+
+/* The account cluster was three bare links in three different styles -- a grey
+   name, a blue "Usage", a blue "Sign out" -- sitting beside neatly styled nav
+   pills. Now the identity is one object you can click, and sign out is a quiet
+   neighbour rather than a peer competing with it. */
+.account {
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 5px 13px 5px 5px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface);
+  color: var(--ink-2); text-decoration: none; font-weight: 560; font-size: 14px;
+  transition: border-color .14s ease, background .14s ease, color .14s ease;
+}
+.account:hover { border-color: var(--brand); color: var(--ink); text-decoration: none; }
+.account[aria-current="page"] { border-color: var(--brand); background: var(--brand-dim); color: var(--brand); }
+.account:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.avatar-xs {
+  width: 26px; height: 26px; border-radius: 50%; flex: none;
+  display: grid; place-items: center;
+  background: linear-gradient(140deg, var(--brand), var(--brand-2));
+  color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .02em;
+}
+
+/* Usage sits with the nav visually -- it is a place you go, not an action. */
+.navlink {
+  padding: 7px 13px; border-radius: 999px; text-decoration: none;
+  font-size: 14.5px; font-weight: 560; color: var(--muted);
+  transition: color .14s ease, background .14s ease;
+}
+.navlink:hover { color: var(--ink); background: var(--surface-2); text-decoration: none; }
+.navlink[aria-current="page"] { color: var(--brand); background: var(--brand-dim); font-weight: 620; }
+
+.signout {
+  padding: 7px 12px; border-radius: 999px; text-decoration: none;
+  font-size: 14px; color: var(--muted); transition: color .14s ease, background .14s ease;
+}
+.signout:hover { color: var(--ink); background: var(--surface-2); text-decoration: none; }
 
 /* ---------- hero ---------- */
 
@@ -687,7 +726,11 @@ footer { text-align: center; padding: 56px 0 0; font-size: 13px; color: var(--mu
   .arrow { padding: 0; transform: rotate(90deg); }
   .post-body { min-height: 0; }
 }
-@media (max-width: 640px) {
+/* 820px, not 640: the bar needs about 760px to sit on one row, so between
+   those widths it wrapped on its own and dropped the account cluster onto a
+   second line looking broken. Better to take the two-row layout deliberately,
+   a little early, than to let flex-wrap decide badly. */
+@media (max-width: 820px) {
   /* Brand and account on the first line, nav on its own underneath. Three
      links do not justify a hamburger and the JavaScript that comes with it. */
   .nav {
@@ -695,7 +738,15 @@ footer { text-align: center; padding: 56px 0 0; font-size: 13px; color: var(--mu
     border-top: 1px solid var(--line-2); padding-top: 8px;
   }
   .nav a { flex: 1; text-align: center; padding: 8px 6px; }
-  .whoami { gap: 10px; font-size: 13.5px; }
+}
+@media (max-width: 560px) {
+  .whoami { gap: 4px; font-size: 13.5px; }
+  /* Avatar only. The name costs most of the width here and the initials
+     already say whose account it is, so brand and account share one row
+     instead of taking two. */
+  .account-name { display: none; }
+  .account { padding: 5px; }
+  .navlink, .signout { padding: 7px 10px; }
 }
 @media (max-width: 520px) {
   .hero { padding: 34px 0 4px; }
