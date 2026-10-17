@@ -5,20 +5,24 @@
 :root {
   color-scheme: light dark;
 
-  --bg:        #f5f7fa;
-  --bg-tint:   #e9effa;
+  --bg:        #f6f7fb;
+  --bg-tint:   #e8e9fb;
   --surface:   #ffffff;
-  --surface-2: #f7f9fc;
-  --ink:       #0e1319;
-  --ink-2:     #3b4552;
-  --muted:     #6b7683;
-  --line:      #dde3ea;
-  --line-2:    #edf0f4;
+  --surface-2: #f4f5fa;
+  --ink:       #0f1222;
+  --ink-2:     #3c4257;
+  /* Darkened from #6b7186, which measured 4.45:1 on --surface-2 -- just under
+     AA. Secondary text sits on that surface in forms, so it has to clear it. */
+  --muted:     #656a80;
+  --line:      #e1e3ee;
+  --line-2:    #eef0f6;
 
-  --brand:     #0a66c2;
-  --brand-2:   #6d4aff;
+  /* Indigo into violet. Kept to two stops so the gradient stays a signal for
+     primary actions rather than decoration sprayed over everything. */
+  --brand:     #4f46e5;
+  --brand-2:   #9333ea;
   --brand-ink: #ffffff;
-  --brand-dim: #0a66c216;
+  --brand-dim: #4f46e514;
 
   --warn-bg:   #fff8e6;
   --warn-line: #f0cf8c;
@@ -26,43 +30,59 @@
 
   --radius:    16px;
   --radius-sm: 10px;
-  --shadow:    0 1px 2px rgba(14,19,25,.05), 0 10px 28px -14px rgba(14,19,25,.2);
-  --shadow-lg: 0 2px 6px rgba(14,19,25,.07), 0 30px 64px -28px rgba(14,19,25,.32);
-  --glow:      radial-gradient(60% 60% at 50% 0%, rgba(10,102,194,.18), transparent 70%);
+  --shadow:    0 1px 2px rgba(15,18,34,.05), 0 10px 28px -14px rgba(15,18,34,.2);
+  --shadow-lg: 0 2px 6px rgba(15,18,34,.07), 0 30px 64px -28px rgba(15,18,34,.3);
+  --glow:      radial-gradient(60% 60% at 50% 0%, rgba(79,70,229,.16), transparent 70%);
+
+  /* The hairline along a card's top edge. This is what makes a surface read as
+     lit from above rather than as a flat rectangle of a different grey. */
+  --edge:      rgba(255,255,255,.9);
+  --glass:     rgba(255,255,255,.72);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg:        #0b0e12;
-    --bg-tint:   #111a28;
-    --surface:   #151a21;
-    --surface-2: #1a2028;
-    --ink:       #eaeef4;
-    --ink-2:     #b6c0cc;
-    --muted:     #8a94a2;
-    --line:      #242b34;
-    --line-2:    #1d232b;
+    /* Carries a blue-violet cast rather than neutral grey. Flat greys are what
+       made this read as unfinished: every surface was the same temperature, so
+       nothing looked lit and nothing looked raised. */
+    --bg:        #070810;
+    --bg-tint:   #16132e;
+    --surface:   #12141f;
+    --surface-2: #191c2a;
+    --ink:       #f2f4fb;
+    --ink-2:     #c3c8db;
+    --muted:     #8c92a8;
+    --line:      #262a3b;
+    --line-2:    #1d2130;
 
-    --brand:     #6cb2f7;
-    --brand-2:   #9b7cff;
-    --brand-ink: #05101d;
-    --brand-dim: #6cb2f71f;
+    --brand:     #818cf8;
+    --brand-2:   #c084fc;
+    --brand-ink: #0b0618;
+    --brand-dim: #818cf81f;
 
     --warn-bg:   #29230f;
     --warn-line: #5b4b1e;
     --warn-ink:  #ecd49b;
 
-    --shadow:    0 1px 2px rgba(0,0,0,.45), 0 10px 28px -14px rgba(0,0,0,.65);
-    --shadow-lg: 0 2px 6px rgba(0,0,0,.55), 0 30px 64px -28px rgba(0,0,0,.85);
-    --glow:      radial-gradient(60% 60% at 50% 0%, rgba(108,178,247,.16), transparent 70%);
+    --shadow:    0 1px 2px rgba(0,0,0,.5), 0 12px 32px -16px rgba(0,0,0,.75);
+    --shadow-lg: 0 2px 8px rgba(0,0,0,.55), 0 36px 72px -30px rgba(0,0,0,.9);
+    --glow:      radial-gradient(60% 60% at 50% 0%, rgba(129,140,248,.2), transparent 70%);
+
+    --edge:      rgba(255,255,255,.07);
+    --glass:     rgba(18,20,31,.72);
   }
 }
 
 :root[data-theme="dark"] {
-  --bg:#0b0e12; --bg-tint:#111a28; --surface:#151a21; --surface-2:#1a2028;
-  --ink:#eaeef4; --ink-2:#b6c0cc; --muted:#8a94a2; --line:#242b34; --line-2:#1d232b;
-  --brand:#6cb2f7; --brand-2:#9b7cff; --brand-ink:#05101d; --brand-dim:#6cb2f71f;
+  --bg:#070810; --bg-tint:#16132e; --surface:#12141f; --surface-2:#191c2a;
+  --ink:#f2f4fb; --ink-2:#c3c8db; --muted:#8c92a8; --line:#262a3b; --line-2:#1d2130;
+  --brand:#818cf8; --brand-2:#c084fc; --brand-ink:#0b0618; --brand-dim:#818cf81f;
   --warn-bg:#29230f; --warn-line:#5b4b1e; --warn-ink:#ecd49b;
+  --shadow: 0 1px 2px rgba(0,0,0,.5), 0 12px 32px -16px rgba(0,0,0,.75);
+  --shadow-lg: 0 2px 8px rgba(0,0,0,.55), 0 36px 72px -30px rgba(0,0,0,.9);
+  --glow: radial-gradient(60% 60% at 50% 0%, rgba(129,140,248,.2), transparent 70%);
+  --edge: rgba(255,255,255,.07);
+  --glass: rgba(18,20,31,.72);
 }
 
 * { box-sizing: border-box; }
@@ -95,9 +115,38 @@ body::before {
 .narrow { max-width: 640px; }
 
 .topbar {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 16px; padding: 22px 0 6px;
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 10px 16px; padding: 16px 0 14px;
+  position: sticky; top: 0; z-index: 20;
+  background: var(--glass);
+  border-bottom: 1px solid transparent;
+  transition: border-color .2s ease;
 }
+/* Frosted only where the browser can actually do it; elsewhere --glass is
+   already opaque enough to keep the text readable over scrolled content. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .topbar { -webkit-backdrop-filter: blur(14px) saturate(1.5); backdrop-filter: blur(14px) saturate(1.5); }
+}
+.topbar:hover { border-bottom-color: var(--line-2); }
+
+/* ---------- main navigation ----------
+   There was none. Every page showed a logo and a sign-out link, so reaching
+   "write a post" from the editor meant going back through the dashboard. */
+
+.nav { display: flex; align-items: center; gap: 2px; margin-right: auto; margin-left: 22px; }
+.nav a {
+  padding: 7px 13px; border-radius: 999px; text-decoration: none;
+  font-size: 14.5px; font-weight: 560; color: var(--muted);
+  transition: color .14s ease, background .14s ease;
+}
+.nav a:hover { color: var(--ink); background: var(--surface-2); text-decoration: none; }
+/* The page you are on, said plainly. Every screen otherwise looks alike. */
+.nav a.on { color: var(--brand); background: var(--brand-dim); font-weight: 620; }
+.nav a:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.whoami .name { color: var(--ink-2); font-weight: 550; text-decoration: none; }
+.whoami .name:hover { color: var(--brand); }
+.btn-sm { padding: 8px 16px; font-size: 14px; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: -.018em; font-size: 16.5px; }
 .brand .mark {
   width: 31px; height: 31px; border-radius: 9px; display: grid; place-items: center;
@@ -105,8 +154,9 @@ body::before {
   color: #fff; flex: none; box-shadow: var(--shadow);
 }
 .brand .mark svg { width: 17px; height: 17px; display: block; }
-.whoami { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--muted); }
-.whoami .name { color: var(--ink-2); font-weight: 550; }
+/* margin-left:auto so it still sits right when there is no nav beside it --
+   the signed-out header has only a brand and a sign-in button. */
+.whoami { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--muted); margin-left: auto; }
 
 /* ---------- hero ---------- */
 
@@ -288,8 +338,19 @@ body::before {
 /* ---------- cards & forms ---------- */
 
 .card {
+  position: relative;
   background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 28px; box-shadow: var(--shadow);
+}
+/* A hairline of light along the top edge. One pixel, and it is the difference
+   between a card that sits on the page and a rectangle painted on it. */
+.card::before,
+.rowcard::before,
+.stat::before,
+.panel::before {
+  content: ""; position: absolute; inset: 0 0 auto; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--edge) 22%, var(--edge) 78%, transparent);
+  border-radius: inherit; pointer-events: none;
 }
 .card + .card { margin-top: 16px; }
 .card h2 { margin: 0 0 6px; font-size: 19px; font-weight: 650; letter-spacing: -.016em; }
@@ -342,18 +403,31 @@ textarea { min-height: 76px; resize: vertical; }
 
 .statrow { display: grid; gap: 12px; grid-template-columns: repeat(3, 1fr); margin: 16px 0 0; }
 .stat {
+  position: relative; overflow: hidden;
   background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 18px 20px;
+  transition: transform .16s cubic-bezier(.2,.7,.3,1), border-color .16s ease, box-shadow .16s ease;
 }
-.stat b { display: block; font-size: 27px; font-weight: 680; letter-spacing: -.03em; line-height: 1.1; }
+.stat:hover { transform: translateY(-2px); border-color: var(--line); box-shadow: var(--shadow); }
+/* A number that is not zero is the interesting one, so let it carry the brand. */
+.stat b {
+  display: block; font-size: 27px; font-weight: 680; letter-spacing: -.03em; line-height: 1.1;
+  background: linear-gradient(120deg, var(--brand), var(--brand-2));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
 .stat span { display: block; font-size: 13px; color: var(--muted); margin-top: 3px; }
-.stat.zero b { color: var(--muted); }
+/* A zero is not news. Drop the gradient entirely rather than just recolouring:
+   with background-clip:text a plain `color` would never show through. */
+.stat.zero b { background: none; -webkit-text-fill-color: var(--muted); color: var(--muted); }
 
 .rowcard {
+  position: relative; overflow: hidden;
   display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
   background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius); padding: 20px 22px; margin-top: 16px;
+  transition: border-color .16s ease, box-shadow .16s ease;
 }
+.rowcard:hover { border-color: var(--brand-dim); box-shadow: var(--shadow); }
 .rowcard h3 { margin: 0 0 3px; font-size: 15.5px; font-weight: 640; }
 .rowcard p { margin: 0; font-size: 14px; color: var(--muted); }
 .rowcard .btn { padding: 9px 16px; font-size: 14px; }
@@ -425,12 +499,20 @@ ul.plain li b { color: var(--ink); }
 
 .typepick { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); margin-top: 8px; }
 .typepick label {
-  margin: 0; padding: 14px 15px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  position: relative; margin: 0; padding: 14px 15px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
   background: var(--surface-2); cursor: pointer; display: block; font-weight: 620; font-size: 14.5px;
-  transition: border-color .14s ease, background .14s ease;
+  transition: border-color .16s ease, background .16s ease,
+              transform .16s cubic-bezier(.2,.7,.3,1), box-shadow .16s ease;
 }
-.typepick label:hover { border-color: var(--brand); }
-.typepick label:has(input:checked) { border-color: var(--brand); background: var(--brand-dim); }
+.typepick label:hover { border-color: var(--brand); transform: translateY(-2px); box-shadow: var(--shadow); }
+/* The chosen one should be unmistakable at a glance -- a tinted border alone
+   was too quiet to find among twelve near-identical tiles. */
+.typepick label:has(input:checked) {
+  border-color: var(--brand); background: var(--brand-dim);
+  box-shadow: 0 0 0 3px var(--brand-dim), var(--shadow);
+}
+.typepick label:has(input:focus-visible) { outline: 2px solid var(--brand); outline-offset: 2px; }
 .typepick input { position: absolute; opacity: 0; pointer-events: none; }
 .typepick small { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; margin-top: 3px; line-height: 1.45; }
 
@@ -604,6 +686,16 @@ footer { text-align: center; padding: 56px 0 0; font-size: 13px; color: var(--mu
   .demo { grid-template-columns: 1fr; }
   .arrow { padding: 0; transform: rotate(90deg); }
   .post-body { min-height: 0; }
+}
+@media (max-width: 640px) {
+  /* Brand and account on the first line, nav on its own underneath. Three
+     links do not justify a hamburger and the JavaScript that comes with it. */
+  .nav {
+    order: 3; width: 100%; margin: 2px 0 0; justify-content: space-between;
+    border-top: 1px solid var(--line-2); padding-top: 8px;
+  }
+  .nav a { flex: 1; text-align: center; padding: 8px 6px; }
+  .whoami { gap: 10px; font-size: 13.5px; }
 }
 @media (max-width: 520px) {
   .hero { padding: 34px 0 4px; }

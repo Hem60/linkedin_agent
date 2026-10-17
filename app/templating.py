@@ -7,6 +7,9 @@ means one place.
 
 from __future__ import annotations
 
+import hashlib
+from pathlib import Path
+
 from fastapi.templating import Jinja2Templates
 
 from app.config import get_settings
@@ -25,6 +28,36 @@ def is_admin(user: User | None) -> bool:
 
 
 templates.env.globals["is_admin"] = is_admin
+
+
+_CSS = Path("app/static/app.css")
+_asset_cache: tuple[float, str] | None = None
+
+
+def asset_version() -> str:
+    """A short hash of the stylesheet, appended to its URL as ?v=.
+
+    Without it a returning browser keeps the stylesheet it already has, and a
+    deploy that changes only CSS reaches nobody until their cache happens to
+    expire.
+
+    Keyed on mtime rather than computed once at import. An import-time hash is
+    correct in production -- a deploy is a restart -- but goes stale the moment
+    anyone edits the CSS under a running dev server, which is exactly when you
+    are looking at the page to see whether the edit worked. The stat costs
+    microseconds and the hash is only recomputed when the file actually moves.
+    """
+    global _asset_cache
+    try:
+        mtime = _CSS.stat().st_mtime
+    except OSError:          # missing file is the server's problem, not the page's
+        return "0"
+    if _asset_cache is None or _asset_cache[0] != mtime:
+        _asset_cache = (mtime, hashlib.sha256(_CSS.read_bytes()).hexdigest()[:10])
+    return _asset_cache[1]
+
+
+templates.env.globals["asset_v"] = asset_version
 
 # Every form needs this; see app/csrf.py.
 from app.csrf import field as _csrf_field  # noqa: E402

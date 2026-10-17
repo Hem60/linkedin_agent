@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}PostPilot{% endblock %}</title>
 <meta name="description" content="Turn a topic into a professional LinkedIn post. Three drafts, written for your role, published now or on a schedule.">
-<link rel="stylesheet" href="/static/app.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230a66c2'/><path d='M7 17.5 25 8l-6.5 17-3.2-6.3z' fill='white'/></svg>">
+<link rel="stylesheet" href="/static/app.css?v={{ asset_v() }}">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%234f46e5'/><stop offset='1' stop-color='%239333ea'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='url(%23g)'/><path d='M7 17.5 25 8l-6.5 17-3.2-6.3z' fill='white'/></svg>">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -20,10 +20,23 @@
       PostPilot
     </a>
     {% if user %}
+    {% set path = request.url.path %}
+    <nav class="nav" aria-label="Main">
+      {# startswith, not equality: /posts/12 is still the Posts section. #}
+      <a href="/"      {% if path == '/' %}class="on" aria-current="page"{% endif %}>Dashboard</a>
+      <a href="/new"   {% if path.startswith('/new') %}class="on" aria-current="page"{% endif %}>Write</a>
+      <a href="/posts" {% if path.startswith('/posts') %}class="on" aria-current="page"{% endif %}>Posts</a>
+    </nav>
     <div class="whoami">
-      <span class="name">{{ user.name }}</span>
+      <a class="name" href="/account"
+         {% if path.startswith('/account') %}aria-current="page"{% endif %}>{{ user.name }}</a>
       {% if is_admin(user) %}<a href="/admin">Usage</a>{% endif %}
       <a href="/auth/logout">Sign out</a>
+    </div>
+    {% else %}
+    {# A visitor who scrolls past the hero had nothing to click until now. #}
+    <div class="whoami">
+      <a class="btn btn-primary btn-sm" href="/auth/login">Sign in</a>
     </div>
     {% endif %}
   </div>
