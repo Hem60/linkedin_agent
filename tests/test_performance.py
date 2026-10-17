@@ -19,7 +19,7 @@ from app.database import SessionLocal
 from app.main import app
 from app.models import ImageSource, Post, PostCategory, PostStatus, Tone, User
 
-UTC = dt.timezone.utc
+UTC = dt.UTC
 SUB = "perfUserA"
 OTHER = "perfUserB"
 

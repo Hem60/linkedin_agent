@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import datetime as dt
 import enum
-from typing import Optional
 
 from sqlalchemy import (
     BigInteger,
@@ -38,7 +37,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
-
 
 # ---------------------------------------------------------------------------
 # Enumerations
@@ -115,14 +113,14 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), nullable=False, default="")
 
     # Fernet ciphertext, never plaintext (plan section 13).
-    access_token: Mapped[Optional[str]] = mapped_column(Text)
-    token_expires_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
+    access_token: Mapped[str | None] = mapped_column(Text)
+    token_expires_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     # When LinkedIn last refused this token with a 401. A token can die long
     # before the 60 days are up -- a password change or revoking the app kills
     # it immediately -- and nothing in the expiry date reflects that. Without
     # this the dashboard keeps reporting a healthy connection while every
     # scheduled post fails one at a time. Cleared on reconnect.
-    token_rejected_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
+    token_rejected_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Personal context, used to write in the member's voice.
     role_title: Mapped[str] = mapped_column(String(200), nullable=False, default="")
@@ -152,21 +150,21 @@ class User(Base):
 
     # Set when the user completes onboarding. Explicit, rather than inferring
     # "is set up" from whether role_title happens to be non-empty.
-    onboarded_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
+    onboarded_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
     # When we last warned that the LinkedIn token is about to expire. Without
     # this the daily sweep would send the same warning every day for a week,
     # which teaches people to ignore it. Cleared on reconnect.
-    expiry_notified_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
+    expiry_notified_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
     # F4: soft delete, so a deletion request can be honoured without orphaning rows.
-    deleted_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=_utcnow
     )
 
-    posts: Mapped[list["Post"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    posts: Mapped[list[Post]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("ix_users_deleted_at", "deleted_at"),
@@ -203,17 +201,17 @@ class Post(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False, default="")
     # Kept apart from `content` so publishing can build LinkedIn's
     # {hashtag|\#|Tag} templates without parsing them back out of prose.
-    hashtags: Mapped[Optional[list]] = mapped_column(JSONB)
+    hashtags: Mapped[list | None] = mapped_column(JSONB)
     # Kept for v2 (F21). Links live in the body in v1.
-    first_comment: Mapped[Optional[str]] = mapped_column(Text)
+    first_comment: Mapped[str | None] = mapped_column(Text)
 
     edited_by_user: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    quality_score: Mapped[Optional[dict]] = mapped_column(JSONB)
+    quality_score: Mapped[dict | None] = mapped_column(JSONB)
 
     # All three drafts from the generation, so the user can switch to another
     # one later without spending another model call.
-    drafts: Mapped[Optional[list]] = mapped_column(JSONB)
-    chosen_draft: Mapped[Optional[int]] = mapped_column(Integer)
+    drafts: Mapped[list | None] = mapped_column(JSONB)
+    chosen_draft: Mapped[int | None] = mapped_column(Integer)
     photo_query: Mapped[str] = mapped_column(
         String(200), nullable=False, default="", server_default=""
     )
@@ -228,31 +226,31 @@ class Post(Base):
     status: Mapped[PostStatus] = mapped_column(
         _enum(PostStatus, "post_status"), nullable=False, default=PostStatus.draft
     )
-    scheduled_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
+    scheduled_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     # When a worker moved this row to `publishing`. A row still publishing long
     # after this was interrupted mid-flight (a crash, a deploy) and needs a
     # human decision -- see worker/scheduler.py:recover_stuck.
-    claimed_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
+    claimed_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
-    model_used: Mapped[Optional[ModelUsed]] = mapped_column(_enum(ModelUsed, "model_used"))
-    linkedin_post_id: Mapped[Optional[str]] = mapped_column(String(128))
+    model_used: Mapped[ModelUsed | None] = mapped_column(_enum(ModelUsed, "model_used"))
+    linkedin_post_id: Mapped[str | None] = mapped_column(String(128))
 
-    error_message: Mapped[Optional[str]] = mapped_column(Text)
+    error_message: Mapped[str | None] = mapped_column(Text)
     retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=_utcnow
     )
-    posted_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
+    posted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
     # When the user copied this for their company page (F20). Not a status: the
     # app never sees it reach LinkedIn, so claiming "posted" would be a lie.
-    copied_at: Mapped[Optional[dt.datetime]] = mapped_column(DateTime(timezone=True))
+    copied_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True))
 
-    user: Mapped["User"] = relationship(back_populates="posts")
-    images: Mapped[list["PostImage"]] = relationship(
+    user: Mapped[User] = relationship(back_populates="posts")
+    images: Mapped[list[PostImage]] = relationship(
         back_populates="post", cascade="all, delete-orphan", order_by="PostImage.position"
     )
-    performance: Mapped[Optional["PostPerformance"]] = relationship(
+    performance: Mapped[PostPerformance | None] = relationship(
         back_populates="post", cascade="all, delete-orphan", uselist=False
     )
 
@@ -304,13 +302,13 @@ class PostImage(Base):
     # Ordering for v2 multi-image posts; always 0 in v1.
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # The URN LinkedIn returns from the Images API, once uploaded.
-    linkedin_image_urn: Mapped[Optional[str]] = mapped_column(String(128))
+    linkedin_image_urn: Mapped[str | None] = mapped_column(String(128))
 
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=_utcnow
     )
 
-    post: Mapped["Post"] = relationship(back_populates="images")
+    post: Mapped[Post] = relationship(back_populates="images")
 
     __table_args__ = (
         UniqueConstraint("post_id", "position", name="uq_post_images_position"),
@@ -329,16 +327,16 @@ class PostPerformance(Base):
         BigInteger, ForeignKey("posts.id", ondelete="CASCADE"), nullable=False, unique=True
     )
 
-    likes: Mapped[Optional[int]] = mapped_column(Integer)
-    comments: Mapped[Optional[int]] = mapped_column(Integer)
+    likes: Mapped[int | None] = mapped_column(Integer)
+    comments: Mapped[int | None] = mapped_column(Integer)
     # The 👍/👎 shortcut, for users who won't type numbers.
-    sentiment: Mapped[Optional[str]] = mapped_column(String(8))
+    sentiment: Mapped[str | None] = mapped_column(String(8))
 
     reported_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=_utcnow
     )
 
-    post: Mapped["Post"] = relationship(back_populates="performance")
+    post: Mapped[Post] = relationship(back_populates="performance")
 
     __table_args__ = (
         CheckConstraint("likes IS NULL OR likes >= 0", name="ck_perf_likes_non_negative"),

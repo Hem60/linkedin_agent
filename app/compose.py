@@ -21,12 +21,18 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app import (
-    limits, llm, performance, photos, publisher, sanitize, scheduling,
-    storage, uploads,
+    limits,
+    llm,
+    performance,
+    photos,
+    publisher,
+    sanitize,
+    scheduling,
+    storage,
+    uploads,
 )
 from app.auth import require_user, token_is_expiring
 from app.config import get_settings
-from app.templating import templates
 from app.database import get_db
 from app.models import (
     AccountType,
@@ -39,6 +45,7 @@ from app.models import (
     User,
 )
 from app.prompts import POST_TYPES, TONES
+from app.templating import templates
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["compose"])

@@ -77,6 +77,6 @@ def asset_version() -> str:
 templates.env.globals["asset_v"] = asset_version
 
 # Every form needs this; see app/csrf.py.
-from app.csrf import field as _csrf_field  # noqa: E402
+from app.csrf import field as _csrf_field
 
 templates.env.globals["csrf"] = _csrf_field

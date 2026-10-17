@@ -15,7 +15,6 @@ from sqlalchemy import text
 from app import auth, security
 from app.database import SessionLocal
 from app.main import app
-from app.models import User
 
 pytestmark = pytest.mark.integration
 
@@ -154,7 +153,7 @@ def test_token_expiry_is_recorded_about_sixty_days_out(client, db):
         text("SELECT token_expires_at FROM users WHERE linkedin_person_urn = :u"),
         {"u": PERSON_URN},
     ).scalar_one()
-    days = (expires - dt.datetime.now(dt.timezone.utc)).days
+    days = (expires - dt.datetime.now(dt.UTC)).days
     assert 58 <= days <= 61, f"expected ~60 days, got {days}"
 
 

@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 
 from app import linkedin, notify, sanitize, security, storage
 from app.config import get_settings
-from app.models import ImageSource, ModelUsed, Post, PostStatus, User
+from app.models import ImageSource, Post, PostStatus, User
 
 log = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class PublishError(Exception):
 
 
 def _now() -> dt.datetime:
-    return dt.datetime.now(dt.timezone.utc)
+    return dt.datetime.now(dt.UTC)
 
 
 # ---------------------------------------------------------------------------
@@ -162,7 +162,7 @@ def publish(db: Session, post: Post) -> Post:
             # member the one thing that would fix it.
             _mark_token_rejected(db, user.id)
         raise PublishError(str(exc)) from exc
-    except Exception as exc:  # noqa: BLE001 -- a claimed post must never be left stuck
+    except Exception as exc:
         _record_failure(db, post, f"{type(exc).__name__}: {exc}", retryable=True)
         raise PublishError(str(exc)) from exc
 
@@ -193,7 +193,7 @@ def _mark_token_rejected(db: Session, user_id: int) -> None:
             db.commit()
             log.warning("user %d: LinkedIn refused the token; connection marked dead",
                         user_id)
-    except Exception:  # noqa: BLE001
+    except Exception:
         log.exception("could not mark the token rejected for user %d", user_id)
         db.rollback()
 
@@ -283,5 +283,5 @@ def _record_failure(db: Session, post: Post, message: str, *, retryable: bool) -
         # three publish failures into AttributeErrors.
         try:
             notify.post_failed(post.user, post, get_settings().app_url)
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.exception("could not send the failure email for post %s", post.id)

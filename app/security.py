@@ -14,8 +14,6 @@ key as permanent for a deployment.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from cryptography.fernet import Fernet, InvalidToken
 
 from app.config import get_settings
@@ -26,8 +24,8 @@ class DecryptionError(Exception):
 
 
 # Set by tests; production always reads the configured key.
-_key_override: Optional[str] = None
-_fernet_cached: Optional[Fernet] = None
+_key_override: str | None = None
+_fernet_cached: Fernet | None = None
 
 
 def _fernet() -> Fernet:
@@ -60,14 +58,14 @@ def decrypt(ciphertext: str) -> str:
         raise DecryptionError("could not decrypt value") from exc
 
 
-def encrypt_optional(plaintext: Optional[str]) -> Optional[str]:
+def encrypt_optional(plaintext: str | None) -> str | None:
     """Empty and missing both store as NULL -- an empty token is not a token."""
     if not plaintext:
         return None
     return encrypt(plaintext)
 
 
-def decrypt_optional(ciphertext: Optional[str]) -> Optional[str]:
+def decrypt_optional(ciphertext: str | None) -> str | None:
     if not ciphertext:
         return None
     return decrypt(ciphertext)

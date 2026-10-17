@@ -7,16 +7,14 @@ with, and that each step hands the next one what it expects.
 
 from __future__ import annotations
 
-import datetime as dt
-
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from app import auth, compose, llm, photos, publisher, storage, uploads
+from app import auth, llm, publisher, storage, uploads
 from app.database import SessionLocal
 from app.main import app
-from app.models import ModelUsed, Post, PostImage, PostStatus
+from app.models import ModelUsed, Post, PostStatus
 
 pytestmark = pytest.mark.integration
 

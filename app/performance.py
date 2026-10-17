@@ -55,7 +55,7 @@ def _clean_count(raw: str) -> int | None:
 
 def pending(db: Session, user: User, *, now: dt.datetime | None = None) -> list[Post]:
     """Published posts old enough to ask about, that nobody has answered yet."""
-    now = now or dt.datetime.now(dt.timezone.utc)
+    now = now or dt.datetime.now(dt.UTC)
     return list(db.scalars(
         select(Post)
         .outerjoin(PostPerformance, PostPerformance.post_id == Post.id)

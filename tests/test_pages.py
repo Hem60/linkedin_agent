@@ -112,9 +112,10 @@ NAV_SUB = "navUser"
 
 @pytest.fixture
 def signed_in(monkeypatch):
+    from sqlalchemy import text
+
     from app import auth
     from app.database import SessionLocal
-    from sqlalchemy import text
 
     monkeypatch.setattr(auth, "exchange_code_for_token",
                         lambda c: {"access_token": "tok", "expires_in": 5_184_000})

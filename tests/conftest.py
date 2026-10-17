@@ -36,7 +36,7 @@ os.environ["RUN_SCHEDULER"] = "false"
 # the compose page shows what is left. Tests needing another value patch it.
 os.environ["DAILY_POST_LIMIT"] = "3"
 
-import pytest  # noqa: E402
+import pytest
 
 TABLES = ("post_performance", "post_images", "usage", "posts", "users")
 
@@ -130,10 +130,10 @@ def isolated_database():
     if settings.db_schema != TEST_SCHEMA:
         pytest.exit("DB_SCHEMA was read before conftest set it.", returncode=2)
 
-    from alembic import command
     from alembic.config import Config
     from sqlalchemy import text
 
+    from alembic import command
     from app.database import engine
 
     cfg = Config("alembic.ini")

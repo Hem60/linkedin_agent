@@ -26,7 +26,7 @@ from app.models import ImageSource, Post, PostCategory, PostStatus, Tone, User
 
 pytestmark = pytest.mark.integration
 
-UTC = dt.timezone.utc
+UTC = dt.UTC
 SUB = "revokeUser"
 
 

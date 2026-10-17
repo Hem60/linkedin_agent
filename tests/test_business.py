@@ -11,8 +11,6 @@ and hands over the text. What matters here:
 
 from __future__ import annotations
 
-import datetime as dt
-
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
@@ -20,7 +18,15 @@ from sqlalchemy import text
 from app import auth, limits, llm, sanitize
 from app.database import SessionLocal
 from app.main import app
-from app.models import AccountType, ImageSource, ModelUsed, Post, PostCategory, PostStatus, Tone, User
+from app.models import (
+    AccountType,
+    ModelUsed,
+    Post,
+    PostCategory,
+    PostStatus,
+    Tone,
+    User,
+)
 from app.onboarding import _valid_page_url
 from app.prompts import POST_TYPES, build_prompt, hashtag_range
 
@@ -98,8 +104,8 @@ def test_a_personal_account_gets_fewer_hashtags_than_a_brand_one():
     personal.account_type = AccountType.personal
     assert hashtag_range(personal, PostCategory.learning) == (5, 8)
 
-    lo, hi = hashtag_range(personal, PostCategory.learning)
-    brand_lo, brand_hi = hashtag_range(_brand_user(), PostCategory.business)
+    _, hi = hashtag_range(personal, PostCategory.learning)
+    _, brand_hi = hashtag_range(_brand_user(), PostCategory.business)
     assert hi <= brand_hi, "a personal post should not out-tag a brand post"
     assert hi <= 12, "past about a dozen, more tags cost reach rather than buying it"
 

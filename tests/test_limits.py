@@ -16,10 +16,10 @@ from sqlalchemy import text
 from app import auth, limits, llm, notify
 from app.database import SessionLocal
 from app.main import app
-from app.models import ModelUsed, Post, PostStatus, User
+from app.models import ModelUsed, Post, User
 from app.templating import is_admin
 
-UTC = dt.timezone.utc
+UTC = dt.UTC
 
 
 # ---------------------------------------------------------------------------
@@ -183,7 +183,7 @@ def _limit(monkeypatch, n):
 
 @pytest.mark.integration
 def test_taking_posts_counts_up(db, monkeypatch):
-    client = _signed_in(monkeypatch)
+    _signed_in(monkeypatch)
     user = _db_user(db)
     _limit(monkeypatch, 3)
 
@@ -312,7 +312,6 @@ def test_the_form_shows_what_is_left(db, monkeypatch):
 @pytest.mark.integration
 def test_generating_beyond_the_limit_is_refused_before_the_model_is_called(db, monkeypatch):
     client = _signed_in(monkeypatch)
-    user = _db_user(db)
     monkeypatch.setattr(limits, "get_settings", lambda: type("S", (), {"daily_post_limit": 1})())
     monkeypatch.setattr(llm, "generate", _fake_generation)
 
@@ -331,7 +330,6 @@ def test_generating_beyond_the_limit_is_refused_before_the_model_is_called(db, m
 @pytest.mark.integration
 def test_a_failed_generation_does_not_cost_a_post(db, monkeypatch):
     client = _signed_in(monkeypatch)
-    user = _db_user(db)
     monkeypatch.setattr(limits, "get_settings", lambda: type("S", (), {"daily_post_limit": 3})())
 
     def down(*a, **k):
@@ -372,8 +370,7 @@ def test_an_admin_sees_usage_but_not_post_text(db, monkeypatch):
     monkeypatch.setattr(limits, "get_settings", lambda: type("S", (), {"daily_post_limit": 3})())
     limits.take_post(db, user)
 
-    from app import admin
-    from app import templating
+    from app import admin, templating
     fake = type("S", (), {"admin_email_list": [f"{SUB}@x.com".lower()],
                           "daily_post_limit": 3, "dry_run": True,
                           "resend_api_key": "", "email_from": ""})()

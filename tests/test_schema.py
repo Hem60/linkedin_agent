@@ -148,7 +148,7 @@ def test_two_workers_never_claim_the_same_post(db, user_id):
     the same row once the first committed -- publishing the post twice under a
     real person's name.
     """
-    past = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5)
+    past = dt.datetime.now(dt.UTC) - dt.timedelta(minutes=5)
     ids = {_insert_post(db, user_id, status="scheduled", scheduled_at=past) for _ in range(2)}
     db.commit()
 
@@ -179,7 +179,7 @@ def test_two_workers_never_claim_the_same_post(db, user_id):
 
 
 def test_a_claimed_post_is_no_longer_claimable(db, user_id):
-    past = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5)
+    past = dt.datetime.now(dt.UTC) - dt.timedelta(minutes=5)
     _insert_post(db, user_id, status="scheduled", scheduled_at=past)
     db.commit()
     try:
@@ -195,7 +195,7 @@ def test_a_claimed_post_is_no_longer_claimable(db, user_id):
 
 
 def test_future_posts_are_not_claimed(db, user_id):
-    future = dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=1)
+    future = dt.datetime.now(dt.UTC) + dt.timedelta(hours=1)
     _insert_post(db, user_id, status="scheduled", scheduled_at=future)
     db.commit()
     try:

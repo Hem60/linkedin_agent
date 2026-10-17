@@ -25,13 +25,13 @@ import datetime as dt
 import json
 import logging
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import storage
-from app.auth import USER_KEY, require_user
+from app.auth import require_user
 from app.database import get_db
 from app.models import Post, User
 from app.templating import templates
@@ -43,8 +43,6 @@ router = APIRouter(tags=["privacy"])
 @router.get("/privacy")
 def privacy(request: Request):
     """Public: LinkedIn expects a reachable policy for apps other people use."""
-    from app.auth import current_user  # local import: avoids a cycle at module load
-
     return templates.TemplateResponse(request, "privacy.html", {"user": None})
 
 
@@ -64,7 +62,7 @@ def export_data(db: Session, user: User) -> dict:
     ).all()
 
     return {
-        "exported_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "exported_at": dt.datetime.now(dt.UTC).isoformat(),
         "account": {
             "name": user.name,
             "email": user.email,
@@ -114,7 +112,9 @@ def export_data(db: Session, user: User) -> dict:
 @router.get("/account/export")
 def export(user: User = Depends(require_user), db: Session = Depends(get_db)) -> Response:
     payload = json.dumps(export_data(db, user), indent=2, ensure_ascii=False)
-    stamp = dt.date.today().isoformat()
+    # The filename's date, fixed to UTC so two people exporting the same
+    # moment get the same name regardless of where the server runs.
+    stamp = dt.datetime.now(dt.UTC).date().isoformat()
     return Response(
         content=payload,
         media_type="application/json",
@@ -177,7 +177,7 @@ def _delete_images(db: Session, user: User) -> int:
             try:
                 storage.delete(path)
                 removed += 1
-            except Exception:  # noqa: BLE001
+            except Exception:
                 log.exception("could not delete %s while deleting account %s",
                               path, user.id)
     return removed

@@ -31,7 +31,7 @@ from app.models import (
 )
 from worker import scheduler
 
-UTC = dt.timezone.utc
+UTC = dt.UTC
 
 
 def _user(tz="Asia/Kolkata", expires_in_days=50) -> User:
@@ -395,7 +395,8 @@ def test_a_post_publishing_right_now_is_left_alone(db, worker_user):
 def test_one_failing_post_does_not_stop_the_others(db, worker_user, monkeypatch):
     """A worker that dies on one bad post stops publishing everyone else's."""
     past = dt.datetime.now(UTC) - dt.timedelta(minutes=1)
-    ids = [_post(db, worker_user, status=PostStatus.scheduled, at=past) for _ in range(3)]
+    for _ in range(3):
+        _post(db, worker_user, status=PostStatus.scheduled, at=past)
 
     real = publisher.publish
     calls = {"n": 0}

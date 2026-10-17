@@ -19,9 +19,9 @@ from sqlalchemy.orm import Session
 
 from app.auth import require_user
 from app.config import get_settings
-from app.templating import templates
 from app.database import get_db
 from app.models import User
+from app.templating import templates
 
 router = APIRouter(tags=["admin"])
 
@@ -67,8 +67,11 @@ _OUTCOMES = text("""
 @router.get("/admin")
 def dashboard(request: Request, user: User = Depends(require_admin),
               db: Session = Depends(get_db)):
-    since = dt.date.today() - dt.timedelta(days=DAYS)
-    since_ts = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=DAYS)
+    # Explicitly UTC, like the instant below it. date.today() is the
+    # server's local date, so on a non-UTC host the two windows would
+    # disagree by a day. Render happens to run UTC -- that is luck.
+    since = dt.datetime.now(dt.UTC).date() - dt.timedelta(days=DAYS)
+    since_ts = dt.datetime.now(dt.UTC) - dt.timedelta(days=DAYS)
 
     daily = db.execute(_DAILY, {"since": since}).mappings().all()
     by_user = db.execute(_BY_USER, {"since": since}).mappings().all()

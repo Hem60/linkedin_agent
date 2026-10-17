@@ -20,8 +20,8 @@ from sqlalchemy.orm import Session
 
 from app.auth import require_user
 from app.database import get_db
-from app.templating import templates
 from app.models import AccountType, Tone, User
+from app.templating import templates
 
 router = APIRouter(tags=["onboarding"])
 
@@ -56,7 +56,9 @@ def _valid_timezone(name: str) -> str:
     try:
         zoneinfo.ZoneInfo(name)
         return name
-    except Exception:
+    except (zoneinfo.ZoneInfoNotFoundError, ValueError, TypeError):
+        # Unknown key, malformed key, and not-a-string respectively: the whole
+        # surface ZoneInfo presents for a value that arrived in a form.
         return "UTC"
 
 
@@ -112,7 +114,7 @@ def save(
         user.buyer_types = ""
         user.company_page_url = ""
 
-    user.onboarded_at = dt.datetime.now(dt.timezone.utc)
+    user.onboarded_at = dt.datetime.now(dt.UTC)
     db.commit()
 
     return RedirectResponse("/", status_code=303)

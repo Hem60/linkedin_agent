@@ -1,0 +1,24 @@
+# Ruff had no configuration here, which meant the rule set was whatever the
+# installed version happened to default to -- an upgrade could quietly move the
+# gate under us. This pins the parts that are a decision rather than a default.
+
+required-version = ">=0.16"
+target-version = "py313"
+
+[lint.flake8-bugbear]
+# B008 fires 50 times on FastAPI's whole idiom: `user: User = Depends(...)` is
+# a call in a default argument, which is the documented way to declare a
+# dependency. These are evaluated by FastAPI per request, not once at import,
+# so the mutable-default hazard B008 exists to catch cannot happen.
+extend-immutable-calls = [
+  "fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body",
+  "fastapi.Form", "fastapi.File", "fastapi.Header", "fastapi.Cookie",
+  "fastapi.UploadFile", "fastapi.Security",
+]
+
+[lint.per-file-ignores]
+# Tests build datetimes to stand for "some moment" and compare them to values
+# the code produced. Pinning a zone on each one says something the assertion
+# does not mean; the code under test is where zone-awareness matters, and DTZ
+# stays switched on there.
+"tests/*" = ["DTZ"]

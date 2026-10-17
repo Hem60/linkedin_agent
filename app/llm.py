@@ -95,14 +95,14 @@ def parse_drafts(text: str, *, tag_range: tuple[int, int] = (3, 5)) -> list[Draf
 
     raw = payload.get("drafts")
     if not isinstance(raw, list):
-        raise ValueError('missing a "drafts" array')
+        raise ValueError('missing a "drafts" array')  # noqa: TRY004
     if len(raw) != DRAFTS_EXPECTED:
         raise ValueError(f"expected {DRAFTS_EXPECTED} drafts, got {len(raw)}")
 
     drafts: list[Draft] = []
     for i, d in enumerate(raw, 1):
         if not isinstance(d, dict):
-            raise ValueError(f"draft {i} is not an object")
+            raise ValueError(f"draft {i} is not an object")  # noqa: TRY004
 
         body = (d.get("body") or "").strip()
         if not body:
@@ -110,7 +110,7 @@ def parse_drafts(text: str, *, tag_range: tuple[int, int] = (3, 5)) -> list[Draf
 
         tags = d.get("hashtags") or []
         if not isinstance(tags, list):
-            raise ValueError(f"draft {i} hashtags is not a list")
+            raise ValueError(f"draft {i} hashtags is not a list")  # noqa: TRY004
         tags = [str(t).lstrip("#").strip() for t in tags]
         tags = [t for t in tags if t]
 
@@ -134,7 +134,9 @@ def parse_drafts(text: str, *, tag_range: tuple[int, int] = (3, 5)) -> list[Draf
 def problems(drafts: list[Draft], tag_range: tuple[int, int]) -> list[str]:
     """Soft checks. These do not fail generation -- they are shown to the user
     and used to ask for a rewrite."""
-    lo, hi = tag_range
+    # Only the floor is checked here: parse_drafts already truncates to
+    # tag_range[1], so a draft cannot reach this point over the top.
+    lo = tag_range[0]
     out = []
     for i, d in enumerate(drafts, 1):
         if d.rendered_length > MAX_RENDERED_CHARS:
@@ -191,13 +193,13 @@ _cooldown_until: dt.datetime | None = None
 
 
 def gemini_in_cooldown() -> bool:
-    return _cooldown_until is not None and dt.datetime.now(dt.timezone.utc) < _cooldown_until
+    return _cooldown_until is not None and dt.datetime.now(dt.UTC) < _cooldown_until
 
 
 def start_gemini_cooldown(minutes: int | None = None) -> None:
     global _cooldown_until
     mins = minutes if minutes is not None else get_settings().gemini_cooldown_minutes
-    _cooldown_until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=mins)
+    _cooldown_until = dt.datetime.now(dt.UTC) + dt.timedelta(minutes=mins)
     log.warning("gemini quota reached; using groq for %d minutes", mins)
 
 
@@ -331,7 +333,7 @@ def generate(
         )
         try:
             text, model = _call_model(ask)
-        except Exception as exc:  # network, quota, SDK error
+        except Exception as exc:  # noqa: BLE001 -- network, quota, SDK error
             last_error = f"{type(exc).__name__}: {exc}"
             log.warning("generation attempt %d failed: %s", attempt, last_error[:200])
             continue

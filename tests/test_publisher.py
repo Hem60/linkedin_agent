@@ -14,7 +14,7 @@ import datetime as dt
 import pytest
 from sqlalchemy import text
 
-from app import linkedin, publisher, sanitize
+from app import linkedin, publisher
 from app.database import SessionLocal
 from app.models import (
     ImageSource,
@@ -50,7 +50,7 @@ def user(db):
         name="Pub Test",
         email="pub@example.com",
         access_token=security.encrypt("fake-linkedin-token"),
-        token_expires_at=dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=30),
+        token_expires_at=dt.datetime.now(dt.UTC) + dt.timedelta(days=30),
     )
     db.add(u)
     db.commit()
@@ -115,7 +115,7 @@ def fake_linkedin(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_a_due_post_is_claimed(db, user):
-    past = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=1)
+    past = dt.datetime.now(dt.UTC) - dt.timedelta(minutes=1)
     p = make_post(db, user, status=PostStatus.scheduled, scheduled_at=past)
     claimed = publisher.claim_due(db)
     assert p.id in [c.id for c in claimed]
@@ -124,14 +124,14 @@ def test_a_due_post_is_claimed(db, user):
 
 
 def test_a_future_post_is_not_claimed(db, user):
-    future = dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=2)
+    future = dt.datetime.now(dt.UTC) + dt.timedelta(hours=2)
     make_post(db, user, status=PostStatus.scheduled, scheduled_at=future)
     assert publisher.claim_due(db) == []
 
 
 def test_a_claimed_post_cannot_be_claimed_again(db, user):
     """The whole point: a restart mid-publish must not post twice."""
-    past = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=1)
+    past = dt.datetime.now(dt.UTC) - dt.timedelta(minutes=1)
     make_post(db, user, status=PostStatus.scheduled, scheduled_at=past)
     assert len(publisher.claim_due(db)) == 1
     assert publisher.claim_due(db) == []
@@ -140,7 +140,7 @@ def test_a_claimed_post_cannot_be_claimed_again(db, user):
 def test_claiming_commits_before_returning(db, user):
     """The claim must be durable before any network call. A separate session
     must be able to see it."""
-    past = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=1)
+    past = dt.datetime.now(dt.UTC) - dt.timedelta(minutes=1)
     p = make_post(db, user, status=PostStatus.scheduled, scheduled_at=past)
     publisher.claim_due(db)
 
@@ -161,7 +161,7 @@ def test_two_workers_racing_publish_exactly_once(db, user, monkeypatch):
     """
     import threading
 
-    past = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=1)
+    past = dt.datetime.now(dt.UTC) - dt.timedelta(minutes=1)
     post = make_post(db, user, status=PostStatus.scheduled, scheduled_at=past)
 
     published: list[int] = []
@@ -288,7 +288,7 @@ def test_a_retryable_failure_reschedules_with_backoff(db, user, no_dry_run, monk
     p = db.get(Post, p.id)
     assert p.status is PostStatus.scheduled
     assert p.retry_count == 1
-    assert p.scheduled_at > dt.datetime.now(dt.timezone.utc)
+    assert p.scheduled_at > dt.datetime.now(dt.UTC)
 
 
 def test_a_permanent_failure_does_not_retry(db, user, no_dry_run, monkeypatch):
@@ -354,7 +354,7 @@ def test_a_broken_notifier_does_not_hide_the_real_failure(db, user, no_dry_run, 
 def test_an_expired_token_fails_without_calling_linkedin(db, user, no_dry_run, monkeypatch):
     monkeypatch.setattr(linkedin, "create_post",
                         lambda *a, **k: pytest.fail("should not reach LinkedIn"))
-    user.token_expires_at = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=1)
+    user.token_expires_at = dt.datetime.now(dt.UTC) - dt.timedelta(days=1)
     db.commit()
 
     p = make_post(db, user)

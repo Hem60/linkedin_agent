@@ -26,7 +26,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.models import User
 
-UTC = dt.timezone.utc
+UTC = dt.UTC
 
 # Enough that a scheduled post is not already due by the time the worker's
 # next tick comes round, which would make "schedule" a slower "publish now".
@@ -53,7 +53,11 @@ def now_utc() -> dt.datetime:
 def parse_local(value: str, tz_name: str) -> dt.datetime:
     """Read a wall-clock time in the user's zone and return it as UTC."""
     try:
-        naive = dt.datetime.strptime(value.strip(), INPUT_FORMAT)
+        # Naive on purpose, and the noqa below says so. The user types a
+        # time meaning it in their own zone; it is given that zone three
+        # lines down and converted. A %z here would demand an offset the
+        # form never collects.
+        naive = dt.datetime.strptime(value.strip(), INPUT_FORMAT)  # noqa: DTZ007
     except ValueError as exc:
         raise ScheduleError("Pick a date and time.") from exc
 

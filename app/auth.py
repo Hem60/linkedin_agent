@@ -119,7 +119,7 @@ def token_is_expiring(user: User, within_days: int = 7) -> bool:
         return True
     if user.token_expires_at is None:
         return True
-    remaining = user.token_expires_at - dt.datetime.now(dt.timezone.utc)
+    remaining = user.token_expires_at - dt.datetime.now(dt.UTC)
     return remaining <= dt.timedelta(days=within_days)
 
 
@@ -179,7 +179,7 @@ def callback(
     if not access_token:
         raise HTTPException(502, "LinkedIn did not return an access token.")
 
-    expires_at = dt.datetime.now(dt.timezone.utc) + dt.timedelta(
+    expires_at = dt.datetime.now(dt.UTC) + dt.timedelta(
         seconds=int(payload.get("expires_in", 5_184_000))
     )
     info = fetch_userinfo(access_token)

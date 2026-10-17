@@ -22,9 +22,9 @@ from starlette.middleware.sessions import SessionMiddleware
 from app import admin, auth, compose, csrf, onboarding, performance, privacy
 from app.auth import current_user, token_is_expiring
 from app.config import get_settings
-from app.templating import templates
 from app.database import engine, get_db
 from app.models import Post, User
+from app.templating import templates
 
 logging.basicConfig(
     level=logging.INFO,
@@ -177,7 +177,7 @@ def index(
             if key in counts:
                 counts[key] = n
         if user.token_expires_at:
-            days_left = (user.token_expires_at - dt.datetime.now(dt.timezone.utc)).days
+            days_left = (user.token_expires_at - dt.datetime.now(dt.UTC)).days
         if auth.token_is_dead(user):
             # LinkedIn has already refused it. The stored expiry is meaningless
             # now, and showing "50 days left" would be a straight lie.

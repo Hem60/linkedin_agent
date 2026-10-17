@@ -63,13 +63,13 @@ class Usage:
 
 def local_date(user: User, *, now: dt.datetime | None = None) -> dt.date:
     """Today, on the user's own calendar."""
-    now = now or dt.datetime.now(dt.timezone.utc)
+    now = now or dt.datetime.now(dt.UTC)
     return to_local(now, user.timezone).date()
 
 
 def _resets_in(user: User, *, now: dt.datetime | None = None) -> str:
     """How long until their midnight, in words."""
-    now = now or dt.datetime.now(dt.timezone.utc)
+    now = now or dt.datetime.now(dt.UTC)
     local = to_local(now, user.timezone)
     midnight = (local + dt.timedelta(days=1)).replace(
         hour=0, minute=0, second=0, microsecond=0

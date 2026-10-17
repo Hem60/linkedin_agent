@@ -27,7 +27,7 @@ from worker import scheduler
 
 pytestmark = pytest.mark.integration
 
-UTC = dt.timezone.utc
+UTC = dt.UTC
 
 # Deliberately spread: half-hour offset, daylight saving in opposite hemispheres,
 # and one that never changes.

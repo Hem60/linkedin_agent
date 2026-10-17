@@ -92,7 +92,7 @@ def warn_expiring_tokens(db: Session, *, now: dt.datetime | None = None) -> int:
     Runs on the same tick as everything else but is cheap: the query matches
     nothing on all but a handful of days per user per two months.
     """
-    now = now or dt.datetime.now(dt.timezone.utc)
+    now = now or dt.datetime.now(dt.UTC)
     users = db.execute(
         text("""
             SELECT id FROM users
@@ -141,7 +141,7 @@ def run_once(db: Session | None = None, *, limit: int = BATCH) -> TickResult:
                 # scheduled if it was retryable.
                 result.failed += 1
                 log.warning("post %s failed: %s", post.id, str(exc)[:160])
-    except Exception:  # noqa: BLE001
+    except Exception:
         log.exception("scheduler tick failed")
         db.rollback()
     finally:

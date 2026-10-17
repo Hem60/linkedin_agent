@@ -10,17 +10,24 @@ Three things, each of which is only worth having if it actually holds:
 
 from __future__ import annotations
 
-import datetime as dt
 import json
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from app import auth, csrf, security, storage
+from app import auth, security, storage
 from app.database import SessionLocal
 from app.main import app
-from app.models import ImageSource, Post, PostCategory, PostImage, PostStatus, Tone, User
+from app.models import (
+    ImageSource,
+    Post,
+    PostCategory,
+    PostImage,
+    PostStatus,
+    Tone,
+    User,
+)
 from app.privacy import export_data
 
 SUB = "privacyUserA"
@@ -151,7 +158,7 @@ def test_every_form_carries_a_token(monkeypatch, db):
     import re
     for path in ("/new", f"/posts/{post.id}", "/account", "/posts"):
         html = client.get(path).text
-        forms = re.findall(r"<form\b[^>]*method=\"post\"[^>]*>(.*?)</form>", html, re.S | re.I)
+        forms = re.findall(r"<form\b[^>]*method=\"post\"[^>]*>(.*?)</form>", html, re.DOTALL | re.IGNORECASE)
         for body in forms:
             assert 'name="_csrf"' in body, f"a form on {path} has no CSRF field"
 
@@ -218,7 +225,7 @@ def test_the_export_never_contains_the_linkedin_token(monkeypatch, db):
 def test_the_export_holds_only_your_own_posts(monkeypatch, db):
     _client(monkeypatch, OTHER)
     other_post = _post(db, _user(db, OTHER))
-    client = _client(monkeypatch, SUB)
+    _client(monkeypatch, SUB)
 
     data = export_data(db, _user(db, SUB))
     assert other_post.id not in [p["id"] for p in data["posts"]]
