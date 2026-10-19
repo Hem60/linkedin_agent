@@ -40,9 +40,9 @@ def test_admin_emails_empty_means_no_admins():
 def test_require_names_every_missing_key():
     s = _settings()
     with pytest.raises(RuntimeError) as exc:
-        s.require("gemini_api_key", "pexels_api_key")
+        s.require("gemini_api_key", "cloudflare_api_token")
     assert "GEMINI_API_KEY" in str(exc.value)
-    assert "PEXELS_API_KEY" in str(exc.value)
+    assert "CLOUDFLARE_API_TOKEN" in str(exc.value)
 
 
 def test_require_passes_when_configured():
