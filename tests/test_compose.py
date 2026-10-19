@@ -11,10 +11,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from app import auth, llm, photos, publisher, storage, uploads
+from app import auth, llm, publisher, storage, uploads
 from app.database import SessionLocal
 from app.main import app
-from app.models import ImageSource, ModelUsed, Post, PostStatus
+from app.models import ModelUsed, Post, PostStatus
 
 pytestmark = pytest.mark.integration
 
@@ -262,72 +262,47 @@ def test_signed_out_requests_are_refused():
 # What the browser is trusted with
 # ---------------------------------------------------------------------------
 
-def _stub_image_pipeline(monkeypatch, raw=b"img"):
-    monkeypatch.setattr(photos, "generate", lambda subject: raw)
-    monkeypatch.setattr(uploads, "prepare_upload", lambda raw, name="": uploads.PreparedImage(
-        data=b"x", content_type="image/jpeg", width=900, height=600, format="JPEG"))
-    monkeypatch.setattr(storage, "put", lambda data, path, ct: storage.StoredImage(
-        path=path, url=f"https://store/public/{path}", content_type=ct, bytes=1))
+URLS_THE_SERVER_MUST_REFUSE = [
+    "http://169.254.169.254/latest/meta-data/",      # cloud metadata endpoint
+    "http://localhost:8000/healthz",
+    "https://evil.example.com/x.jpg",
+    "http://images.pexels.com/photos/1.jpg",         # right host, wrong scheme
+    "https://images.pexels.com.evil.com/x.jpg",      # look-alike host
+    "file:///etc/passwd",
+]
 
 
-def test_the_server_never_fetches_a_url_the_browser_supplied(client, monkeypatch):
-    """This route used to take a Pexels URL and fetch it, which meant guarding
-    against a signed-in user pointing the server at 169.254.169.254 or
-    localhost. Generation takes a prompt and gets bytes back from the model, so
-    there is no address to abuse. Asserted rather than assumed: a later change
-    that reintroduced a fetch here would reopen the hole quietly."""
+def test_the_server_will_not_fetch_arbitrary_urls(client, monkeypatch):
+    """The photo URL arrives from the browser. Fetching whatever it says would
+    let any signed-in user make the server request internal addresses.
+
+    One post for all six, rather than a sign-in and a generated draft each:
+    every one is refused before anything is fetched, so there is no state for
+    them to share badly.
+    """
     fetched: list[str] = []
     monkeypatch.setattr(storage, "fetch", lambda *a, **k: fetched.append(a[0] if a else "?"))
-    _stub_image_pipeline(monkeypatch)
     pid = create(client)
 
-    for hostile in ("http://169.254.169.254/latest/meta-data/",
-                    "file:///etc/passwd",
-                    "https://evil.example.com/x.jpg"):
-        r = client.post(f"/posts/{pid}/image/generate", data={"q": hostile})
-        assert r.status_code == 303, f"{hostile} returned {r.status_code}"
+    for url in URLS_THE_SERVER_MUST_REFUSE:
+        r = client.post(f"/posts/{pid}/image/pexels", data={"url": url})
+        assert r.status_code == 400, f"{url} returned {r.status_code}"
 
     assert fetched == [], f"the server fetched {fetched}"
 
 
-def test_a_generated_image_is_attached_to_the_post(client, db, monkeypatch):
-    _stub_image_pipeline(monkeypatch)
-    pid = create(client)
-    r = client.post(f"/posts/{pid}/image/generate", data={"q": "a quiet workshop"})
-    assert r.status_code == 303
-    db.expire_all()
-    post = db.get(Post, pid)
-    assert len(post.images) == 1
-    assert post.images[0].source is ImageSource.generated
-
-
-def test_the_draft_photo_query_is_used_when_no_prompt_is_typed(client, db, monkeypatch):
-    """The model already suggested a subject with the draft; making the user
-    retype it to get an image would be asking for work already done."""
-    seen: list[str] = []
-    monkeypatch.setattr(photos, "generate", lambda subject: seen.append(subject) or b"img")
+def test_a_genuine_pexels_url_is_accepted(client, db, monkeypatch):
+    monkeypatch.setattr(storage, "fetch", lambda *a, **k: b"img")
     monkeypatch.setattr(uploads, "prepare_upload", lambda raw, name="": uploads.PreparedImage(
         data=b"x", content_type="image/jpeg", width=900, height=600, format="JPEG"))
     monkeypatch.setattr(storage, "put", lambda data, path, ct: storage.StoredImage(
         path=path, url=f"https://store/public/{path}", content_type=ct, bytes=1))
     pid = create(client)
-    db.expire_all()
-    query = db.get(Post, pid).photo_query
-
-    client.post(f"/posts/{pid}/image/generate", data={"q": ""})
-    assert seen == [query]
-
-
-def test_an_image_generation_failure_is_shown_not_raised(client, db, monkeypatch):
-    def boom(subject):
-        raise photos.ImageGenError("Daily image allowance reached.")
-    monkeypatch.setattr(photos, "generate", boom)
-    pid = create(client)
-    r = client.post(f"/posts/{pid}/image/generate", data={"q": "anything"})
+    r = client.post(f"/posts/{pid}/image/pexels",
+                    data={"url": "https://images.pexels.com/photos/1/large.jpg"})
     assert r.status_code == 303
-    assert "allowance" in r.headers["location"].lower()
     db.expire_all()
-    assert not db.get(Post, pid).images
+    assert len(db.get(Post, pid).images) == 1
 
 
 def test_an_uploaded_non_image_is_refused_with_a_message(client, db):
@@ -346,11 +321,16 @@ def test_replacing_an_image_removes_the_old_file(client, db, monkeypatch):
     deleted: list[str] = []
     monkeypatch.setattr(storage, "delete", lambda path: deleted.append(path))
     monkeypatch.setattr(storage, "path_from_url", lambda url: url.rsplit("public/", 1)[-1])
-    _stub_image_pipeline(monkeypatch)
+    monkeypatch.setattr(storage, "fetch", lambda *a, **k: b"img")
+    monkeypatch.setattr(uploads, "prepare_upload", lambda raw, name="": uploads.PreparedImage(
+        data=b"x", content_type="image/jpeg", width=900, height=600, format="JPEG"))
+    monkeypatch.setattr(storage, "put", lambda data, path, ct: storage.StoredImage(
+        path=path, url=f"https://store/public/{path}", content_type=ct, bytes=1))
 
     pid = create(client)
     for _ in range(2):
-        client.post(f"/posts/{pid}/image/generate", data={"q": "a quiet workshop"})
+        client.post(f"/posts/{pid}/image/pexels",
+                    data={"url": "https://images.pexels.com/photos/1/large.jpg"})
     assert len(deleted) == 1
     db.expire_all()
     assert len(db.get(Post, pid).images) == 1

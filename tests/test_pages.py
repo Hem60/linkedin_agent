@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -83,6 +84,13 @@ def test_the_version_changes_when_the_stylesheet_changes(tmp_path, monkeypatch):
 
     first = templating.asset_version()
     css.write_text("a{color:blue}", encoding="utf-8")
+    # The version is keyed on mtime, and two writes inside one filesystem
+    # timestamp tick leave mtime where it was -- which made this test fail
+    # intermittently, asserting a hash against itself. Advance mtime
+    # explicitly so what is under test is "the file changed", not how coarse
+    # this filesystem's clock happens to be.
+    st = css.stat()
+    os.utime(css, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000_000))
     second = templating.asset_version()
 
     assert first != second, "editing the stylesheet did not change its version"

@@ -48,9 +48,7 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
-      - key: CLOUDFLARE_ACCOUNT_ID
-        sync: false
-      - key: CLOUDFLARE_API_TOKEN
+      - key: PEXELS_API_KEY
         sync: false
       - key: STORAGE_URL
         sync: false

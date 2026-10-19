@@ -43,6 +43,13 @@ _settings = get_settings()
 engine = create_engine(
     _settings.database_url,
     pool_pre_ping=True,      # survive a Postgres connection dropped while idle
+    # Supabase's session-mode pooler hands each client its own server
+    # connection and reclaims the ones sitting idle. pool_pre_ping checks a
+    # connection at checkout, which does not help when the pooler drops one
+    # that is already in use: that surfaces as "server closed the connection
+    # unexpectedly" in the middle of a statement. Recycling well inside the
+    # pooler's own idle window means we retire connections before it does.
+    pool_recycle=240,
     pool_size=5,
     max_overflow=5,
     future=True,

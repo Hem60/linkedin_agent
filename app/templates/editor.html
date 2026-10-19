@@ -79,16 +79,28 @@
           </form>
         {% endif %}
 
-        <form method="post" action="/posts/{{ post.id }}/image/generate" class="imgrow">{{ csrf(request) }}
-          <input type="text" name="q" value="{{ photo_query }}" placeholder="describe the image">
-          <button class="btn btn-ghost" type="submit">
-            {% if post.images %}Generate another{% else %}Generate image{% endif %}
-          </button>
+        <form method="get" action="/posts/{{ post.id }}#photos" class="imgrow">
+          <input type="text" name="q" value="{{ photo_query }}" placeholder="search stock photos">
+          <button class="btn btn-ghost" type="submit">Find photos</button>
         </form>
-        {# The model cannot write, so the prompt steers away from anything
-           containing text. Saying so here stops people asking for a terminal
-           and getting letterforms that spell nothing. #}
-        <p class="muted">Describes a scene, not a screenshot — text and interfaces come out garbled.</p>
+
+        {% if photo_error %}<p class="muted" style="color:#c0392b">{{ photo_error }}</p>{% endif %}
+
+        {% if candidates %}
+        <div class="picker">
+          {% for p in candidates %}
+          <form method="post" action="/posts/{{ post.id }}/image/pexels">{{ csrf(request) }}
+            <input type="hidden" name="url" value="{{ p.url }}">
+            <button type="submit" title="Use this photo">
+              <img src="{{ p.preview_url }}" alt="{{ p.alt or 'Stock photo' }}" loading="lazy">
+            </button>
+            <div class="by">{{ p.credit }}</div>
+          </form>
+          {% endfor %}
+        </div>
+        {% elif photo_query is not none and request.query_params.get('q') is not none and not photo_error %}
+          <p class="muted">No photos for that search. Try fewer, simpler words.</p>
+        {% endif %}
 
         <form method="post" action="/posts/{{ post.id }}/image/upload"
               enctype="multipart/form-data" class="imgrow">{{ csrf(request) }}

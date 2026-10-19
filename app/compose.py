@@ -51,6 +51,7 @@ log = logging.getLogger(__name__)
 router = APIRouter(tags=["compose"])
 
 EDITABLE = {PostStatus.draft, PostStatus.failed}
+PEXELS_IMAGE_HOSTS = {"images.pexels.com"}
 
 
 # ---------------------------------------------------------------------------
@@ -225,11 +226,18 @@ def editor(post_id: int, request: Request, q: str | None = None,
 
     prep = sanitize.prepare(post.content, post.hashtags or [])
 
+    candidates, photo_error = [], None
+    if q is not None and post.status in EDITABLE:
+        try:
+            candidates = photos.search(q or post.photo_query)
+        except (photos.PhotoSearchError, RuntimeError) as exc:
+            photo_error = str(exc)
+
     return _render(
         request, "editor.html", user=user, post=post, prep=prep,
-        editable=post.status in EDITABLE,
+        editable=post.status in EDITABLE, candidates=candidates,
         photo_query=q if q is not None else post.photo_query,
-        dry_run=get_settings().dry_run,
+        photo_error=photo_error, dry_run=get_settings().dry_run,
         token_expiring=token_is_expiring(user),
         message=request.query_params.get("m"),
         can_rate=(post.status is PostStatus.posted),
@@ -267,31 +275,24 @@ def save(post_id: int, content: str = Form(""), hashtags: str = Form(""),
 # Images
 # ---------------------------------------------------------------------------
 
-@router.post("/posts/{post_id}/image/generate")
-def generate_image(post_id: int, q: str = Form(""),
-                   user: User = Depends(require_user), db: Session = Depends(get_db)):
-    """Generate an image for this post and attach it.
-
-    One image rather than a row of candidates: the old Pexels picker existed
-    because a search returns many photos and only the reader can say which
-    fits. Generation returns an image of this post, and another press costs a
-    second and a fortieth of a day's free allowance, so choosing again is
-    cheaper than choosing between.
-
-    Nothing is fetched from a URL the browser supplied, so the SSRF check the
-    Pexels route needed has no counterpart here -- the bytes come straight
-    back from the model.
-    """
+@router.post("/posts/{post_id}/image/pexels")
+def pick_pexels(post_id: int, url: str = Form(...),
+                user: User = Depends(require_user), db: Session = Depends(get_db)):
     post = _own_post(db, user, post_id)
     if post.status not in EDITABLE:
         raise HTTPException(400, "Only drafts can be edited.")
 
+    # The URL comes from the browser, so it is untrusted. Without this check the
+    # server would fetch any address a user supplies -- an SSRF hole pointing at
+    # whatever the server can reach.
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https" or parsed.hostname not in PEXELS_IMAGE_HOSTS:
+        raise HTTPException(400, "That image address isn't from Pexels.")
+
     try:
-        raw = photos.generate(q or post.photo_query or "")
-        prepared = uploads.prepare_upload(raw)
-        _attach(db, post, prepared, ImageSource.generated, user)
-    except (photos.ImageGenError, uploads.ImageRejected,
-            storage.StorageError, RuntimeError) as exc:
+        prepared = uploads.prepare_upload(storage.fetch(url))
+        _attach(db, post, prepared, ImageSource.pexels, user)
+    except (uploads.ImageRejected, storage.StorageError) as exc:
         return RedirectResponse(
             f"/posts/{post.id}?m={urllib.parse.quote(str(exc))}", status_code=303)
     return RedirectResponse(f"/posts/{post.id}?m=image#preview", status_code=303)

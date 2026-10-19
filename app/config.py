@@ -46,16 +46,8 @@ class Settings(BaseSettings):
     gemini_cooldown_minutes: int = 30
     model_timeout_seconds: int = 45
 
-    # --- Images and storage -----------------------------------------------
-    # Images are generated rather than searched: Cloudflare Workers AI runs
-    # FLUX.1 Schnell inside a free daily allowance, which covers far more
-    # images than DAILY_POST_LIMIT can ask for.
-    cloudflare_account_id: str = ""
-    cloudflare_api_token: str = ""
-    image_model: str = "@cf/black-forest-labs/flux-1-schnell"
-    # Schnell is distilled for few steps; 4 is its sweet spot and costs about
-    # 43 of the 10,000 free Neurons a day.
-    image_steps: int = 4
+    # --- Photos and storage -----------------------------------------------
+    pexels_api_key: str = ""
     storage_url: str = ""
     storage_key: str = ""
     storage_bucket: str = "post-images"

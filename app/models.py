@@ -74,11 +74,7 @@ class PostStatus(str, enum.Enum):
 
 
 class ImageSource(str, enum.Enum):
-    # pexels is retained for rows written before images were generated rather
-    # than searched. Nothing produces it now, and dropping it from the enum
-    # would orphan those posts' images.
     pexels = "pexels"
-    generated = "generated"
     upload = "upload"
     none = "none"
 
