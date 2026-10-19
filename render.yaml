@@ -70,7 +70,7 @@ services:
       # APP_URL must match the service's real URL exactly: it is the OAuth
       # redirect LinkedIn validates against, and the origin CSRF compares to.
       - key: APP_URL
-        value: https://postpilot.onrender.com
+        value: https://postpilot-2sd2.onrender.com
       - key: LINKEDIN_API_VERSION
         value: "202609"
       - key: STORAGE_BUCKET
