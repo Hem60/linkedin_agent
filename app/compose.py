@@ -21,6 +21,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app import (
+    imagegen,
     limits,
     llm,
     performance,
@@ -293,6 +294,36 @@ def pick_pexels(post_id: int, url: str = Form(...),
         prepared = uploads.prepare_upload(storage.fetch(url))
         _attach(db, post, prepared, ImageSource.pexels, user)
     except (uploads.ImageRejected, storage.StorageError) as exc:
+        return RedirectResponse(
+            f"/posts/{post.id}?m={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(f"/posts/{post.id}?m=image#preview", status_code=303)
+
+
+@router.post("/posts/{post_id}/image/generate")
+def generate_image(post_id: int, q: str = Form(""),
+                   user: User = Depends(require_user), db: Session = Depends(get_db)):
+    """Generate an image for this post and attach it.
+
+    One image per press, not a row of candidates. The Pexels picker shows
+    several because a search returns several and only the reader can say which
+    fits; generation returns an image of this post, so pressing again is a
+    second attempt rather than a choice between near-identical ones. It also is
+    not free -- each press costs about a seventh of the day's allowance -- so
+    generating three in order to discard two would be the wrong trade.
+
+    Nothing here is fetched from a browser-supplied URL, so the SSRF check the
+    Pexels route needs has no counterpart: the bytes come back from the model.
+    """
+    post = _own_post(db, user, post_id)
+    if post.status not in EDITABLE:
+        raise HTTPException(400, "Only drafts can be edited.")
+
+    try:
+        raw = imagegen.generate(q or post.photo_query or "")
+        prepared = uploads.prepare_upload(raw)
+        _attach(db, post, prepared, ImageSource.generated, user)
+    except (imagegen.ImageGenError, uploads.ImageRejected,
+            storage.StorageError, RuntimeError) as exc:
         return RedirectResponse(
             f"/posts/{post.id}?m={urllib.parse.quote(str(exc))}", status_code=303)
     return RedirectResponse(f"/posts/{post.id}?m=image#preview", status_code=303)

@@ -7,14 +7,16 @@ with, and that each step hands the next one what it expects.
 
 from __future__ import annotations
 
+import urllib.parse
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from app import auth, llm, publisher, storage, uploads
+from app import auth, imagegen, llm, publisher, storage, uploads
 from app.database import SessionLocal
 from app.main import app
-from app.models import ModelUsed, Post, PostStatus
+from app.models import ImageSource, ModelUsed, Post, PostStatus
 
 pytestmark = pytest.mark.integration
 
@@ -303,6 +305,76 @@ def test_a_genuine_pexels_url_is_accepted(client, db, monkeypatch):
     assert r.status_code == 303
     db.expire_all()
     assert len(db.get(Post, pid).images) == 1
+
+
+def _stub_generation(monkeypatch, raw=b"img"):
+    monkeypatch.setattr(imagegen, "generate", lambda subject: raw)
+    monkeypatch.setattr(uploads, "prepare_upload", lambda raw, name="": uploads.PreparedImage(
+        data=b"x", content_type="image/jpeg", width=1024, height=576, format="JPEG"))
+    monkeypatch.setattr(storage, "put", lambda data, path, ct: storage.StoredImage(
+        path=path, url=f"https://store/public/{path}", content_type=ct, bytes=1))
+
+
+def test_a_generated_image_is_attached_to_the_post(client, db, monkeypatch):
+    _stub_generation(monkeypatch)
+    pid = create(client)
+    r = client.post(f"/posts/{pid}/image/generate", data={"q": "a quiet workshop"})
+    assert r.status_code == 303
+    db.expire_all()
+    post = db.get(Post, pid)
+    assert len(post.images) == 1
+    assert post.images[0].source is ImageSource.generated
+
+
+def test_generating_uses_the_drafts_own_photo_query_when_nothing_is_typed(
+        client, db, monkeypatch):
+    """The model already suggested a subject with the draft; making someone
+    retype it to get a picture is asking for work already done."""
+    seen: list[str] = []
+    monkeypatch.setattr(imagegen, "generate", lambda subject: seen.append(subject) or b"img")
+    monkeypatch.setattr(uploads, "prepare_upload", lambda raw, name="": uploads.PreparedImage(
+        data=b"x", content_type="image/jpeg", width=1024, height=576, format="JPEG"))
+    monkeypatch.setattr(storage, "put", lambda data, path, ct: storage.StoredImage(
+        path=path, url=f"https://store/public/{path}", content_type=ct, bytes=1))
+    pid = create(client)
+    db.expire_all()
+    query = db.get(Post, pid).photo_query
+
+    client.post(f"/posts/{pid}/image/generate", data={"q": ""})
+    assert seen == [query]
+
+
+def test_generating_never_fetches_a_browser_supplied_url(client, monkeypatch):
+    """The Pexels route takes a URL and fetches it, which is why it checks the
+    host. Generation takes a prompt and gets bytes back, so there is no address
+    to abuse -- asserted, so that reintroducing a fetch here cannot pass
+    unnoticed."""
+    fetched: list[str] = []
+    monkeypatch.setattr(storage, "fetch", lambda *a, **k: fetched.append(a[0] if a else "?"))
+    _stub_generation(monkeypatch)
+    pid = create(client)
+
+    for hostile in ("http://169.254.169.254/latest/meta-data/", "file:///etc/passwd"):
+        assert client.post(f"/posts/{pid}/image/generate",
+                           data={"q": hostile}).status_code == 303
+    assert fetched == [], f"the server fetched {fetched}"
+
+
+def test_a_spent_allowance_is_shown_and_points_at_the_photo_search(
+        client, db, monkeypatch):
+    """Seven or so images a day, then the page must still offer a way to get a
+    picture rather than looking broken."""
+    def spent(subject):
+        raise imagegen.ImageGenError(
+            "Today's image allowance is used up. Search for a photo instead.")
+    monkeypatch.setattr(imagegen, "generate", spent)
+    pid = create(client)
+    r = client.post(f"/posts/{pid}/image/generate", data={"q": "anything"})
+    assert r.status_code == 303
+    # The message rides in the query string, so it arrives percent-encoded.
+    assert "search for a photo" in urllib.parse.unquote(r.headers["location"]).lower()
+    db.expire_all()
+    assert not db.get(Post, pid).images
 
 
 def test_an_uploaded_non_image_is_refused_with_a_message(client, db):

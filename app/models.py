@@ -75,6 +75,7 @@ class PostStatus(str, enum.Enum):
 
 class ImageSource(str, enum.Enum):
     pexels = "pexels"
+    generated = "generated"
     upload = "upload"
     none = "none"
 

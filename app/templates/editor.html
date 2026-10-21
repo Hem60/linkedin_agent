@@ -79,6 +79,16 @@
           </form>
         {% endif %}
 
+        {# Two sources on purpose. Generation is the one people reach for, but
+           the free allowance is about seven images a day, so the search stays
+           as somewhere to go when it runs out. #}
+        <form method="post" action="/posts/{{ post.id }}/image/generate" class="imgrow">{{ csrf(request) }}
+          <input type="text" name="q" value="{{ photo_query }}" placeholder="describe the image">
+          <button class="btn btn-ghost" type="submit">
+            {% if post.images %}Generate another{% else %}Generate image{% endif %}
+          </button>
+        </form>
+
         <form method="get" action="/posts/{{ post.id }}#photos" class="imgrow">
           <input type="text" name="q" value="{{ photo_query }}" placeholder="search stock photos">
           <button class="btn btn-ghost" type="submit">Find photos</button>

@@ -47,7 +47,27 @@ class Settings(BaseSettings):
     model_timeout_seconds: int = 45
 
     # --- Photos and storage -----------------------------------------------
+    # Two sources, deliberately. Generation is the one the brief asks for, but
+    # the free Neuron allowance runs to roughly seven images a day, and a post
+    # still needs a picture after that -- so the Pexels search stays as the
+    # fallback rather than leaving the page with nothing to offer.
     pexels_api_key: str = ""
+
+    cloudflare_account_id: str = ""
+    cloudflare_api_token: str = ""
+    # Pinned here rather than in code so a model can be swapped from the Render
+    # dashboard when a better one ships, without a redeploy. flux-1-schnell was
+    # tried first and cannot render writing: asked for a screen it produced a
+    # garbled headline and an invented logo, and it rejects width/height.
+    image_model: str = "@cf/leonardo/lucid-origin"
+    # 1024x576 for two reasons: the feed crops tall images, and tiles are
+    # charged by area -- 2.25 tiles against 4 for a square, which is the
+    # difference between about seven free images a day and about four.
+    image_width: int = 1024
+    image_height: int = 576
+    image_steps: int = 20
+    image_guidance: float = 4.5
+
     storage_url: str = ""
     storage_key: str = ""
     storage_bucket: str = "post-images"

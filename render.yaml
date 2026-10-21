@@ -50,6 +50,10 @@ services:
         sync: false
       - key: PEXELS_API_KEY
         sync: false
+      - key: CLOUDFLARE_ACCOUNT_ID
+        sync: false
+      - key: CLOUDFLARE_API_TOKEN
+        sync: false
       - key: STORAGE_URL
         sync: false
       - key: STORAGE_KEY
@@ -108,6 +112,11 @@ services:
         value: gemini-3.5-flash-lite
       - key: GROQ_MODEL
         value: openai/gpt-oss-120b
+
+      # Pinned so the image model can be changed from the dashboard when a
+      # better one appears, the same reason the text models are pinned.
+      - key: IMAGE_MODEL
+        value: "@cf/leonardo/lucid-origin"
       - key: MODEL_TIMEOUT_SECONDS
         value: "45"
 
