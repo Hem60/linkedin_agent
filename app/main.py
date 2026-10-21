@@ -142,6 +142,12 @@ def healthz() -> dict[str, object]:
         "detail": detail,
         "dry_run": settings.dry_run,
         "linkedin_api_version": settings.linkedin_api_version,
+        # Which model the deployment is actually generating with. The same
+        # reasoning as the two above: a setting that changes behaviour and is
+        # set per environment, so the only way to know what production is
+        # really using was to sign in and generate an image. A model id is not
+        # a secret; the token that reaches it is, and that stays out of here.
+        "image_model": settings.image_model,
     }
 
 

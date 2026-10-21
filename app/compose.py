@@ -318,8 +318,15 @@ def generate_image(post_id: int, q: str = Form(""),
     if post.status not in EDITABLE:
         raise HTTPException(400, "Only drafts can be edited.")
 
+    # What someone types is a description of the picture they want, so it goes
+    # to the model as written. The draft's own photo_query is a bare noun
+    # phrase from the writing model and needs the house style to look like a
+    # photograph. Treating both the same returned a studio portrait of a dog
+    # for "a perfect photo for the peanut".
+    typed = bool(q.strip())
     try:
-        raw = imagegen.generate(q or post.photo_query or "")
+        raw = imagegen.generate(q if typed else (post.photo_query or ""),
+                                styled=not typed)
         prepared = uploads.prepare_upload(raw)
         _attach(db, post, prepared, ImageSource.generated, user)
     except (imagegen.ImageGenError, uploads.ImageRejected,

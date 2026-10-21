@@ -308,7 +308,7 @@ def test_a_genuine_pexels_url_is_accepted(client, db, monkeypatch):
 
 
 def _stub_generation(monkeypatch, raw=b"img"):
-    monkeypatch.setattr(imagegen, "generate", lambda subject: raw)
+    monkeypatch.setattr(imagegen, "generate", lambda subject, styled=True: raw)
     monkeypatch.setattr(uploads, "prepare_upload", lambda raw, name="": uploads.PreparedImage(
         data=b"x", content_type="image/jpeg", width=1024, height=576, format="JPEG"))
     monkeypatch.setattr(storage, "put", lambda data, path, ct: storage.StoredImage(
@@ -331,7 +331,8 @@ def test_generating_uses_the_drafts_own_photo_query_when_nothing_is_typed(
     """The model already suggested a subject with the draft; making someone
     retype it to get a picture is asking for work already done."""
     seen: list[str] = []
-    monkeypatch.setattr(imagegen, "generate", lambda subject: seen.append(subject) or b"img")
+    monkeypatch.setattr(imagegen, "generate",
+                        lambda subject, styled=True: seen.append(subject) or b"img")
     monkeypatch.setattr(uploads, "prepare_upload", lambda raw, name="": uploads.PreparedImage(
         data=b"x", content_type="image/jpeg", width=1024, height=576, format="JPEG"))
     monkeypatch.setattr(storage, "put", lambda data, path, ct: storage.StoredImage(
@@ -342,6 +343,21 @@ def test_generating_uses_the_drafts_own_photo_query_when_nothing_is_typed(
 
     client.post(f"/posts/{pid}/image/generate", data={"q": ""})
     assert seen == [query]
+
+
+def test_a_typed_prompt_reaches_the_model_unstyled(client, db, monkeypatch):
+    """The box is the user's, not the app's: what they type is what is drawn."""
+    seen: list[tuple[str, bool]] = []
+    monkeypatch.setattr(imagegen, "generate",
+                        lambda subject, styled=True: seen.append((subject, styled)) or b"img")
+    monkeypatch.setattr(uploads, "prepare_upload", lambda raw, name="": uploads.PreparedImage(
+        data=b"x", content_type="image/jpeg", width=1024, height=576, format="JPEG"))
+    monkeypatch.setattr(storage, "put", lambda data, path, ct: storage.StoredImage(
+        path=path, url=f"https://store/public/{path}", content_type=ct, bytes=1))
+
+    pid = create(client)
+    client.post(f"/posts/{pid}/image/generate", data={"q": "a red tractor in a field"})
+    assert seen == [("a red tractor in a field", False)]
 
 
 def test_generating_never_fetches_a_browser_supplied_url(client, monkeypatch):
@@ -364,7 +380,7 @@ def test_a_spent_allowance_is_shown_and_points_at_the_photo_search(
         client, db, monkeypatch):
     """Seven or so images a day, then the page must still offer a way to get a
     picture rather than looking broken."""
-    def spent(subject):
+    def spent(subject, styled=True):
         raise imagegen.ImageGenError(
             "Today's image allowance is used up. Search for a photo instead.")
     monkeypatch.setattr(imagegen, "generate", spent)

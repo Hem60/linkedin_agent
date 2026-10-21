@@ -228,3 +228,27 @@ def test_a_long_name_cannot_push_the_header_onto_two_rows(signed_in):
     assert rule, "the account name needs a width rule"
     assert "text-overflow: ellipsis" in rule.group(1)
     assert "max-width" in rule.group(1)
+
+
+# ---------------------------------------------------------------------------
+# Health
+# ---------------------------------------------------------------------------
+
+def test_healthz_reports_the_database_and_the_image_model():
+    """The cron pinger lives on this endpoint, and it is also the only way to
+    see which image model a deployment is really using without signing in --
+    environment variables are not otherwise visible from outside."""
+    r = client.get("/healthz")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["database"] in ("up", "down")
+    assert body["image_model"], "the model in use should be reportable"
+    assert "dry_run" in body
+
+
+def test_healthz_never_leaks_a_credential():
+    """It is a public endpoint: anyone can read it, including the pinger. The
+    model id is not a secret, but the token that reaches it is."""
+    body = client.get("/healthz").text.lower()
+    for secret in ("token", "secret", "api_key", "password", "bearer"):
+        assert secret not in body, f"{secret!r} appears in a public response"

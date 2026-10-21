@@ -7,12 +7,20 @@ how often the second is available.
 
 On the model. flux-1-schnell was tried first and failed twice over: it rejects
 width and height outright, and it cannot render writing -- asked for a screen
-it produced a confident headline that spelled nothing, plus an invented logo.
-Telling it not to made things worse, because it has no negation and Workers AI
+it produced a confident headline that spelled nothing, beside an invented logo.
+Telling it not to made matters worse, since it has no negation and Workers AI
 exposes no negative_prompt, so "no text" simply fed it the word text.
 lucid-origin takes a size, follows the prompt, and renders incidental text the
-way a camera does: softened, angled, out of focus. Verified against the real
-photo_query values this app had already produced.
+way a camera does: angled, soft, out of focus.
+
+On whose words win. There are two ways a subject arrives here, and they want
+opposite treatment. The draft's own photo_query is a bare noun phrase the
+writing model produced -- "server rack data center" -- and it needs styling to
+become a photograph. A prompt somebody typed is already a description of what
+they want, and adding to it overrides them: "a perfect photo for the peanut"
+plus this module's old portrait styling returned a studio portrait of a dog,
+Peanut being a common dog name and the styling having asked for exactly that
+kind of picture. So a typed prompt is sent as written. See `compose_prompt`.
 
 Cost is the live constraint. lucid-origin is 636 Neurons per 512x512 tile
 against a free 10,000 a day, so a 1024x576 image is about 1,431 -- roughly
@@ -34,16 +42,17 @@ log = logging.getLogger(__name__)
 API_ROOT = "https://api.cloudflare.com/client/v4/accounts"
 
 # Long enough for a real description, short enough that the subject is not lost
-# behind the styling that follows it.
-MAX_SUBJECT_CHARS = 180
+# behind anything appended to it.
+MAX_SUBJECT_CHARS = 400
 
-# Phrased only as what to photograph. Nothing here says "no" to anything: a
-# diffusion model without a negative_prompt reads a forbidden noun as a
-# requested one, which is how the first attempt produced the very text it was
-# told to avoid.
+# Applied only to the draft's own photo_query, which arrives as a bare noun
+# phrase and would otherwise come back looking like clip art. Phrased only as
+# what to photograph: a diffusion model with no negative_prompt reads a
+# forbidden noun as a requested one, which is how an earlier version produced
+# the very text it was told to avoid.
 STYLE = (
     "professional editorial photograph, clean composition, "
-    "soft natural light, muted palette, shallow depth of field"
+    "soft natural light, muted palette"
 )
 
 
@@ -51,17 +60,21 @@ class ImageGenError(Exception):
     """Cloudflare could not be reached, or refused the request."""
 
 
-def compose_prompt(subject: str) -> str:
-    """Put the subject first, then the styling.
+def compose_prompt(subject: str, *, styled: bool = True) -> str:
+    """Build the prompt actually sent to the model.
 
-    Order matters: with the style leading, the model renders the style and
-    loses the subject.
+    `styled` is the difference between the two callers. The draft's photo_query
+    gets the house style appended; a prompt someone typed does not, because
+    they have already said what they want and anything added here argues with
+    it.
     """
     cleaned = " ".join(subject.split())[:MAX_SUBJECT_CHARS]
-    return f"{cleaned}. {STYLE}" if cleaned else ""
+    if not cleaned:
+        return ""
+    return f"{cleaned}. {STYLE}" if styled else cleaned
 
 
-def generate(subject: str) -> bytes:
+def generate(subject: str, *, styled: bool = True) -> bytes:
     """Generate one landscape image for a post, returning the raw bytes.
 
     Raises ImageGenError with a message meant for the user. An empty subject
@@ -71,7 +84,7 @@ def generate(subject: str) -> bytes:
     s = get_settings()
     s.require("cloudflare_account_id", "cloudflare_api_token")
 
-    prompt = compose_prompt(subject)
+    prompt = compose_prompt(subject, styled=styled)
     if not prompt:
         raise ImageGenError("Describe the image you want first.")
 
@@ -87,8 +100,7 @@ def generate(subject: str) -> bytes:
                 "steps": s.image_steps,
                 "guidance": s.image_guidance,
             },
-            # Measured at about four seconds; the ceiling is for a bad day, not
-            # a typical one.
+            # Measured at about four seconds; the ceiling is for a bad day.
             timeout=90,
         )
     except httpx.HTTPError as exc:

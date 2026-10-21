@@ -88,6 +88,27 @@ def test_the_prompt_never_asks_for_the_absence_of_anything(configured, monkeypat
         assert negation not in style, f"{negation!r} in styling: {style}"
 
 
+def test_a_typed_prompt_is_sent_exactly_as_written(configured, monkeypatch):
+    """Someone typing a prompt has already said what they want. Appending the
+    house style to it argues with them: "a perfect photo for the peanut" plus
+    portrait styling returned a studio portrait of a dog, Peanut being a common
+    dog name and the styling having asked for that kind of picture."""
+    seen = capture(monkeypatch)
+    typed = "make a perfect photo for the peanut"
+    imagegen.generate(typed, styled=False)
+    assert seen["json"]["prompt"] == typed
+
+
+def test_the_drafts_own_query_still_gets_the_house_style(configured, monkeypatch):
+    """photo_query arrives as a bare noun phrase from the writing model and
+    would come back looking like clip art without it."""
+    seen = capture(monkeypatch)
+    imagegen.generate("server rack data center", styled=True)
+    prompt = seen["json"]["prompt"]
+    assert prompt.startswith("server rack data center.")
+    assert "editorial photograph" in prompt
+
+
 def test_the_image_is_landscape_and_sized_from_settings(configured, monkeypatch):
     """The feed crops tall images, and tiles are charged by area: 1024x576 is
     2.25 tiles against 4 for a square, which roughly doubles how many fit in a
