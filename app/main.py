@@ -148,6 +148,7 @@ def healthz() -> dict[str, object]:
         # really using was to sign in and generate an image. A model id is not
         # a secret; the token that reaches it is, and that stays out of here.
         "image_model": settings.image_model,
+        "image_fallback_model": settings.image_fallback_model,
     }
 
 

@@ -88,35 +88,70 @@ def generate(subject: str, *, styled: bool = True) -> bytes:
     if not prompt:
         raise ImageGenError("Describe the image you want first.")
 
-    url = f"{API_ROOT}/{s.cloudflare_account_id}/ai/run/{s.image_model}"
-    try:
-        resp = httpx.post(
-            url,
-            headers={"Authorization": f"Bearer {s.cloudflare_api_token}"},
-            json={
-                "prompt": prompt,
-                "width": s.image_width,
-                "height": s.image_height,
-                "steps": s.image_steps,
-                "guidance": s.image_guidance,
-            },
-            # Measured at about four seconds; the ceiling is for a bad day.
-            timeout=90,
-        )
-    except httpx.HTTPError as exc:
-        raise ImageGenError(f"Could not reach the image service: {exc}") from exc
+    models = [s.image_model]
+    if s.image_fallback_model and s.image_fallback_model != s.image_model:
+        models.append(s.image_fallback_model)
 
-    if resp.status_code in (401, 403):
-        raise ImageGenError("The Cloudflare API token was rejected.")
-    if resp.status_code == 429:
-        raise ImageGenError(
-            "Today's image allowance is used up. Search for a photo instead, "
-            "or generate again tomorrow."
-        )
-    if resp.status_code != 200:
-        raise ImageGenError(f"The image service returned {resp.status_code}.")
+    last_429 = None
+    for model in models:
+        try:
+            resp = _call(s, model, prompt)
+        except httpx.HTTPError as exc:
+            raise ImageGenError(f"Could not reach the image service: {exc}") from exc
 
-    return _decode(resp)
+        if resp.status_code == 429:
+            # Not necessarily the end: the allowance is account-wide, but the
+            # models differ in price by a factor of about twenty-four, so a
+            # budget with too little left for the expensive one may still have
+            # plenty for the cheap one.
+            last_429 = resp
+            log.info("%s is out of allowance, trying the next model", model)
+            continue
+        if resp.status_code in (401, 403):
+            raise ImageGenError("The Cloudflare API token was rejected.")
+        if resp.status_code != 200:
+            raise ImageGenError(f"The image service returned {resp.status_code}.")
+
+        if model is not models[0]:
+            log.info("generated with the fallback model %s", model)
+        return _decode(resp)
+
+    assert last_429 is not None
+    raise ImageGenError(
+        "Today's image allowance is used up. Search for a photo instead, "
+        "or generate again tomorrow."
+    )
+
+
+def _call(s, model: str, prompt: str) -> httpx.Response:
+    """One request, in whichever shape the model insists on.
+
+    The flux-2 models reject a JSON body outright -- "required properties at
+    '/' are 'multipart'" -- while lucid-origin takes JSON and the sizing
+    arguments. Hence two shapes rather than one.
+    """
+    url = f"{API_ROOT}/{s.cloudflare_account_id}/ai/run/{model}"
+    headers = {"Authorization": f"Bearer {s.cloudflare_api_token}"}
+
+    if "flux-2" in model:
+        # Sizing is not offered here; what comes back is the model's own
+        # default, which is the price of being the cheap way to carry on.
+        return httpx.post(url, headers=headers,
+                          files={"prompt": (None, prompt)}, timeout=90)
+
+    return httpx.post(
+        url,
+        headers=headers,
+        json={
+            "prompt": prompt,
+            "width": s.image_width,
+            "height": s.image_height,
+            "steps": s.image_steps,
+            "guidance": s.image_guidance,
+        },
+        # Measured at about four seconds; the ceiling is for a bad day.
+        timeout=90,
+    )
 
 
 def _decode(resp: httpx.Response) -> bytes:

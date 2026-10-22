@@ -43,6 +43,7 @@ def configured(monkeypatch):
     monkeypatch.setattr(imagegen, "get_settings", lambda: type("S", (), {
         "cloudflare_account_id": "acct", "cloudflare_api_token": "tok",
         "image_model": "@cf/leonardo/lucid-origin",
+        "image_fallback_model": "@cf/black-forest-labs/flux-2-klein-4b",
         "image_width": 1024, "image_height": 576,
         "image_steps": 20, "image_guidance": 4.5,
         "require": lambda self, *a: None})())
@@ -189,3 +190,69 @@ def test_a_non_json_reply_is_reported_clearly(configured, monkeypatch):
     capture(monkeypatch, FakeResponse(200, NOT_JSON))
     with pytest.raises(imagegen.ImageGenError, match="could not read"):
         imagegen.generate("anything")
+
+
+# ---------------------------------------------------------------------------
+# Falling back to the cheaper model
+# ---------------------------------------------------------------------------
+
+def queue(monkeypatch, *responses):
+    """Answer successive POSTs with the given responses, recording each call."""
+    calls: list[dict] = []
+    remaining = list(responses)
+
+    def fake_post(url, **kw):
+        calls.append({"url": url, **kw})
+        return remaining.pop(0) if remaining else FakeResponse()
+
+    monkeypatch.setattr(imagegen.httpx, "post", fake_post)
+    return calls
+
+
+def test_the_cheap_model_is_tried_when_the_dear_one_will_not_fit(configured, monkeypatch):
+    """The allowance is account-wide, so this does not survive it reaching
+    zero. But lucid-origin costs about 1,431 Neurons and the fallback about
+    59, so a budget with too little left for the first has room for two dozen
+    of the second."""
+    calls = queue(monkeypatch, FakeResponse(429, {}), FakeResponse(200))
+    assert imagegen.generate("a quiet workshop") == PIXEL
+    assert len(calls) == 2
+    assert calls[0]["url"].endswith("@cf/leonardo/lucid-origin")
+    assert calls[1]["url"].endswith("@cf/black-forest-labs/flux-2-klein-4b")
+
+
+def test_the_fallback_is_not_called_when_the_first_model_works(configured, monkeypatch):
+    calls = queue(monkeypatch, FakeResponse(200))
+    imagegen.generate("a quiet workshop")
+    assert len(calls) == 1, "the dear model succeeded; nothing else should run"
+
+
+def test_both_models_out_of_allowance_points_at_the_photo_search(configured, monkeypatch):
+    calls = queue(monkeypatch, FakeResponse(429, {}), FakeResponse(429, {}))
+    with pytest.raises(imagegen.ImageGenError, match="Search for a photo"):
+        imagegen.generate("a quiet workshop")
+    assert len(calls) == 2, "both should be tried before giving up"
+
+
+def test_each_model_is_sent_the_shape_it_demands(configured, monkeypatch):
+    """lucid-origin takes JSON with the sizing arguments. The flux-2 models
+    refuse a JSON body outright -- "required properties at '/' are
+    'multipart'" -- so they get a multipart form instead."""
+    calls = queue(monkeypatch, FakeResponse(429, {}), FakeResponse(200))
+    imagegen.generate("a quiet workshop")
+
+    assert "json" in calls[0], "lucid-origin takes JSON"
+    assert calls[0]["json"]["width"] == 1024
+
+    assert "files" in calls[1], "flux-2 needs multipart"
+    assert "json" not in calls[1]
+    assert calls[1]["files"]["prompt"][1] .startswith("a quiet workshop")
+
+
+def test_a_real_error_is_not_mistaken_for_a_spent_allowance(configured, monkeypatch):
+    """Only 429 means "no budget". A 500 is a fault and should say so rather
+    than quietly trying the other model and reporting the wrong thing."""
+    calls = queue(monkeypatch, FakeResponse(500, {}))
+    with pytest.raises(imagegen.ImageGenError, match="500"):
+        imagegen.generate("a quiet workshop")
+    assert len(calls) == 1, "a fault should not trigger the fallback"

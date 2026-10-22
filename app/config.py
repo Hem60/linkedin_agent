@@ -60,6 +60,12 @@ class Settings(BaseSettings):
     # tried first and cannot render writing: asked for a screen it produced a
     # garbled headline and an invented logo, and it rejects width/height.
     image_model: str = "@cf/leonardo/lucid-origin"
+    # Tried when the first cannot be afforded. The daily Neuron allowance is
+    # account-wide rather than per model, so this does not survive the budget
+    # reaching zero -- but lucid-origin costs about 1,431 Neurons and this one
+    # about 59, so the slice of the day where the expensive model no longer
+    # fits is still worth two dozen images from the cheap one.
+    image_fallback_model: str = "@cf/black-forest-labs/flux-2-klein-4b"
     # 1024x576 for two reasons: the feed crops tall images, and tiles are
     # charged by area -- 2.25 tiles against 4 for a square, which is the
     # difference between about seven free images a day and about four.
