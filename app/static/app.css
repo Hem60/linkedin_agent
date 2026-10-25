@@ -806,3 +806,5 @@ footer { text-align: center; padding: 56px 0 0; font-size: 13px; color: var(--mu
 }
 .cardform textarea { resize: vertical; line-height: 1.5; }
 .cardform button { justify-self: start; }
+.cardform .cardrow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 560px) { .cardform .cardrow { grid-template-columns: 1fr; } }

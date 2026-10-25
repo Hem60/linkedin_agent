@@ -343,6 +343,9 @@ def generate_card(post_id: int,
                   eyebrow: str = Form(""),
                   subhead: str = Form(""),
                   features: str = Form(""),
+                  photo_subject: str = Form(""),
+                  brand: str = Form(""),
+                  contacts: str = Form(""),
                   user: User = Depends(require_user),
                   db: Session = Depends(get_db)):
     """Draw a branded card for this post.
@@ -367,25 +370,34 @@ def generate_card(post_id: int,
         label, _, detail = line.partition("|")
         parsed.append(postcard.Feature(label.strip(), detail.strip()))
 
-    # Reuse the picture already on the post when there is one: the card is a
-    # frame around it, and regenerating would spend allowance to no purpose.
+    # The picture has to be of what the card says. Reusing whatever was already
+    # attached put a photograph of a code editor on a card about exporting
+    # peanuts, because the draft's photo_query had been written for a different
+    # post. So the subject comes from the card: what was typed for the picture,
+    # or failing that the headline, and only then the draft's own query.
+    subject = photo_subject.strip() or headline.strip() or post.photo_query or ""
+    reuse = bool(post.images) and not photo_subject.strip() and not headline.strip()
+
     hero: bytes | None = None
     try:
-        if post.images:
+        if reuse:
             hero = storage.fetch(post.images[0].url)
-        else:
-            hero = imagegen.generate(post.photo_query or headline, styled=True)
+        elif subject:
+            hero = imagegen.generate(subject, styled=True)
     except (imagegen.ImageGenError, storage.StorageError) as exc:
         log.info("card hero unavailable, drawing without one: %s", exc)
 
     try:
         card = postcard.Card(
-            headline=headline or post.topic or "",
-            eyebrow=eyebrow,
-            subhead=subhead,
+            # No fallback to post.topic: that is the instruction someone typed
+            # to get a draft -- "write the post for import peanut" -- and it
+            # went straight onto the card as its headline.
+            headline=headline.strip(),
+            eyebrow=eyebrow.strip(),
+            subhead=subhead.strip(),
             features=parsed,
-            brand=user.company_name or "",
-            contacts=[c for c in (user.company_page_url or "").split(",") if c][:3],
+            brand=(brand or user.company_name or "").strip(),
+            contacts=[c.strip() for c in contacts.split(",") if c.strip()][:3],
         )
         prepared = uploads.prepare_upload(postcard.render(card, hero))
         _attach(db, post, prepared, ImageSource.card, user)

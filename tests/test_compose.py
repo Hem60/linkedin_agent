@@ -424,6 +424,59 @@ def test_a_branded_card_is_drawn_and_attached(client, db, monkeypatch):
     assert post.images[0].source is ImageSource.card
 
 
+def test_the_card_picture_is_of_what_the_card_says(client, db, monkeypatch):
+    """A card about exporting peanuts came back showing a code editor, because
+    the route reused whatever was already attached -- a picture generated from
+    a photo_query written for an entirely different post."""
+    from app import imagegen, postcard
+
+    asked: list[str] = []
+    monkeypatch.setattr(imagegen, "generate",
+                        lambda subject, styled=True: asked.append(subject) or b"img")
+    monkeypatch.setattr(storage, "fetch",
+                        lambda *a, **k: pytest.fail("reused a stale picture"))
+    real_render = postcard.render
+    monkeypatch.setattr(postcard, "render", lambda card, photo=None: real_render(card, None))
+    monkeypatch.setattr(uploads, "prepare_upload", lambda raw, name="": uploads.PreparedImage(
+        data=b"x", content_type="image/jpeg", width=1080, height=1350, format="JPEG"))
+    monkeypatch.setattr(storage, "put", lambda data, path, ct: storage.StoredImage(
+        path=path, url=f"https://store/public/{path}", content_type=ct, bytes=1))
+
+    pid = create(client)
+    client.post(f"/posts/{pid}/image/card", data={"headline": "PREMIUM PEANUTS"})
+    assert asked == ["PREMIUM PEANUTS"]
+
+    asked.clear()
+    client.post(f"/posts/{pid}/image/card", data={
+        "headline": "PREMIUM PEANUTS", "photo_subject": "raw peanuts in a sack"})
+    assert asked == ["raw peanuts in a sack"], "a typed subject should win"
+
+
+def test_the_headline_is_never_the_instruction_that_made_the_draft(client, db, monkeypatch):
+    """post.topic is what someone typed to get a draft -- "write the post for
+    import peanut" -- and it was going onto the card as its headline."""
+    from app import imagegen, postcard
+
+    monkeypatch.setattr(imagegen, "generate", lambda subject, styled=True: b"img")
+    seen: list = []
+    real_render = postcard.render
+    monkeypatch.setattr(
+        postcard, "render",
+        lambda card, photo=None: seen.append(card) or real_render(card, None))
+    monkeypatch.setattr(uploads, "prepare_upload", lambda raw, name="": uploads.PreparedImage(
+        data=b"x", content_type="image/jpeg", width=1080, height=1350, format="JPEG"))
+    monkeypatch.setattr(storage, "put", lambda data, path, ct: storage.StoredImage(
+        path=path, url=f"https://store/public/{path}", content_type=ct, bytes=1))
+
+    pid = create(client)
+    db.expire_all()
+    topic = db.get(Post, pid).topic
+
+    client.post(f"/posts/{pid}/image/card", data={"headline": "PREMIUM PEANUTS"})
+    assert seen[0].headline == "PREMIUM PEANUTS"
+    assert seen[0].headline != topic
+
+
 def test_a_card_is_still_drawn_when_no_picture_can_be_had(client, db, monkeypatch):
     """A spent allowance should cost the photograph, not the card."""
     from app import imagegen
