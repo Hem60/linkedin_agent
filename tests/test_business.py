@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import text
 
 from app import auth, limits, llm, sanitize
 from app.database import SessionLocal
@@ -29,6 +28,7 @@ from app.models import (
 )
 from app.onboarding import _valid_page_url
 from app.prompts import POST_TYPES, build_prompt, hashtag_range
+from tests.conftest import purge_users
 
 SUB = "brandUser"
 
@@ -141,9 +141,7 @@ def _purge(request):
     s = SessionLocal()
 
     def purge():
-        s.rollback()
-        s.execute(text("DELETE FROM users WHERE linkedin_person_urn LIKE 'urn:li:person:brand%'"))
-        s.commit()
+        purge_users("brand", s)
 
     purge()
     yield

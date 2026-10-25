@@ -18,11 +18,11 @@ from __future__ import annotations
 import datetime as dt
 
 import pytest
-from sqlalchemy import text
 
 from app import auth, linkedin, publisher, security
 from app.database import SessionLocal
 from app.models import ImageSource, Post, PostCategory, PostStatus, Tone, User
+from tests.conftest import purge_users
 
 pytestmark = pytest.mark.integration
 
@@ -45,9 +45,7 @@ def _purge():
     s = SessionLocal()
 
     def purge():
-        s.rollback()
-        s.execute(text("DELETE FROM users WHERE linkedin_person_urn LIKE 'urn:li:person:revoke%'"))
-        s.commit()
+        purge_users("revoke", s)
 
     purge()
     yield

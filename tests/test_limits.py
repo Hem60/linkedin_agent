@@ -11,13 +11,13 @@ import threading
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import text
 
 from app import auth, limits, llm, notify
 from app.database import SessionLocal
 from app.main import app
 from app.models import ModelUsed, Post, User
 from app.templating import is_admin
+from tests.conftest import purge_users
 
 UTC = dt.UTC
 
@@ -151,9 +151,7 @@ def _purge(request):
     s = SessionLocal()
 
     def purge():
-        s.rollback()
-        s.execute(text("DELETE FROM users WHERE linkedin_person_urn LIKE 'urn:li:person:limits%'"))
-        s.commit()
+        purge_users("limits", s)
 
     purge()
     yield

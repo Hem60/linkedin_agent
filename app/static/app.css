@@ -788,3 +788,21 @@ footer { text-align: center; padding: 56px 0 0; font-size: 13px; color: var(--mu
   *, *::before, *::after { transition: none !important; animation: none !important; }
   .reveal { opacity: 1; transform: none; }
 }
+
+/* ---------- branded card form ----------
+   Folded away by default: most posts take a photograph, and the card is the
+   deliberate choice rather than the usual one. */
+.cardform { margin: 10px 0 4px; }
+.cardform summary {
+  cursor: pointer; font-size: 14px; color: var(--muted);
+  padding: 7px 0; user-select: none;
+}
+.cardform summary:hover { color: var(--ink); }
+.cardform form { display: grid; gap: 8px; margin-top: 8px; }
+.cardform input, .cardform textarea {
+  width: 100%; padding: 9px 12px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--surface);
+  color: var(--ink); font: inherit; font-size: 14px;
+}
+.cardform textarea { resize: vertical; line-height: 1.5; }
+.cardform button { justify-self: start; }

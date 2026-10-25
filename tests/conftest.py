@@ -157,5 +157,59 @@ def isolated_database():
     yield
 
 
+def purge_users(prefix: str, session=None, attempts: int = 3) -> None:
+    """Delete this module's test users, surviving a dropped connection.
+
+    Supabase's session-mode pooler hands out a server connection per client
+    and reclaims the idle ones. pool_recycle retires them on our side first,
+    but nothing can save a connection that dies mid-statement -- and when that
+    lands in a teardown, a test that passed is reported as an error. It has
+    cost four full runs.
+
+    So the cleanup retries on a fresh pool rather than failing the test it was
+    tidying up after. A cleanup is idempotent by nature: deleting rows that are
+    already gone is free.
+    """
+    from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError
+
+    from app.database import SessionLocal, engine
+
+    # The caller's session may hold a transaction, or a connection that has
+    # already died. Releasing it must not itself raise: that is the failure
+    # this helper exists to prevent, one line earlier.
+    if session is not None:
+        try:
+            session.rollback()
+        except OperationalError:
+            pass
+
+    last: Exception | None = None
+    for attempt in range(attempts):
+        session = SessionLocal()
+        try:
+            session.execute(
+                text("DELETE FROM users WHERE linkedin_person_urn LIKE :p"),
+                {"p": f"urn:li:person:{prefix}%"},
+            )
+            session.commit()
+            return
+        except OperationalError as exc:
+            last = exc
+            # The connection is gone; rolling it back would raise again.
+            try:
+                session.rollback()
+            except OperationalError:
+                pass
+            engine.dispose()        # discard the whole dead pool
+        finally:
+            try:
+                session.close()
+            except OperationalError:
+                pass
+    if last is not None:
+        raise last
+
+
 def pytest_report_header(config):
     return f"database schema: {TEST_SCHEMA} (isolated from public)"

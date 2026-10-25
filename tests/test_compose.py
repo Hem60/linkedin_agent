@@ -11,12 +11,12 @@ import urllib.parse
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import text
 
 from app import auth, imagegen, llm, publisher, storage, uploads
 from app.database import SessionLocal
 from app.main import app
 from app.models import ImageSource, ModelUsed, Post, PostStatus
+from tests.conftest import purge_users
 
 pytestmark = pytest.mark.integration
 
@@ -36,9 +36,7 @@ def db():
 @pytest.fixture(autouse=True)
 def _purge(db):
     def purge():
-        db.rollback()
-        db.execute(text("DELETE FROM users WHERE linkedin_person_urn LIKE 'urn:li:person:compose%'"))
-        db.commit()
+        purge_users("compose", db)
     purge()
     yield
     purge()
@@ -183,7 +181,7 @@ def test_an_over_length_post_cannot_be_published(client, db, monkeypatch):
 
 def test_a_dry_run_can_be_deleted_from_its_page(client, db):
     """Dry runs are practice. Without a Delete button, every test run would
-    leave a post the user can never remove from the app."""
+leave a post the user can never remove from the app."""
     pid = create(client)
     client.post(f"/posts/{pid}/choose", data={"index": 0})
     client.post(f"/posts/{pid}/publish")                         # dry run
@@ -329,7 +327,7 @@ def test_a_generated_image_is_attached_to_the_post(client, db, monkeypatch):
 def test_generating_uses_the_drafts_own_photo_query_when_nothing_is_typed(
         client, db, monkeypatch):
     """The model already suggested a subject with the draft; making someone
-    retype it to get a picture is asking for work already done."""
+retype it to get a picture is asking for work already done."""
     seen: list[str] = []
     monkeypatch.setattr(imagegen, "generate",
                         lambda subject, styled=True: seen.append(subject) or b"img")
@@ -379,7 +377,7 @@ def test_generating_never_fetches_a_browser_supplied_url(client, monkeypatch):
 def test_a_spent_allowance_is_shown_and_points_at_the_photo_search(
         client, db, monkeypatch):
     """Seven or so images a day, then the page must still offer a way to get a
-    picture rather than looking broken."""
+picture rather than looking broken."""
     def spent(subject, styled=True):
         raise imagegen.ImageGenError(
             "Today's image allowance is used up. Search for a photo instead.")
@@ -391,6 +389,59 @@ def test_a_spent_allowance_is_shown_and_points_at_the_photo_search(
     assert "search for a photo" in urllib.parse.unquote(r.headers["location"]).lower()
     db.expire_all()
     assert not db.get(Post, pid).images
+
+
+def test_a_branded_card_is_drawn_and_attached(client, db, monkeypatch):
+    """The words on the card are the words that were typed -- which is the
+    whole reason it is drawn rather than generated."""
+    from app import imagegen, postcard
+
+    monkeypatch.setattr(imagegen, "generate", lambda subject, styled=True: b"img")
+    seen: list = []
+    real_render = postcard.render
+    monkeypatch.setattr(
+        postcard, "render",
+        lambda card, photo=None: seen.append(card) or real_render(card, None))
+    monkeypatch.setattr(uploads, "prepare_upload", lambda raw, name="": uploads.PreparedImage(
+        data=b"x", content_type="image/jpeg", width=1080, height=1350, format="JPEG"))
+    monkeypatch.setattr(storage, "put", lambda data, path, ct: storage.StoredImage(
+        path=path, url=f"https://store/public/{path}", content_type=ct, bytes=1))
+
+    pid = create(client)
+    r = client.post(f"/posts/{pid}/image/card", data={
+        "headline": "WHY COMPARTMENTS\n|MATTER",
+        "eyebrow": "PRODUCT SPOTLIGHT",
+        "features": "Keeps food separate | No mixing\nCatering ready | For volume",
+    })
+    assert r.status_code == 303
+    assert seen[0].headline == "WHY COMPARTMENTS\n|MATTER"
+    assert [f.label for f in seen[0].features] == ["Keeps food separate", "Catering ready"]
+    assert seen[0].features[0].detail == "No mixing"
+
+    db.expire_all()
+    post = db.get(Post, pid)
+    assert len(post.images) == 1
+    assert post.images[0].source is ImageSource.card
+
+
+def test_a_card_is_still_drawn_when_no_picture_can_be_had(client, db, monkeypatch):
+    """A spent allowance should cost the photograph, not the card."""
+    from app import imagegen
+
+    def spent(subject, styled=True):
+        raise imagegen.ImageGenError("Today's image allowance is used up.")
+
+    monkeypatch.setattr(imagegen, "generate", spent)
+    monkeypatch.setattr(uploads, "prepare_upload", lambda raw, name="": uploads.PreparedImage(
+        data=b"x", content_type="image/jpeg", width=1080, height=1350, format="JPEG"))
+    monkeypatch.setattr(storage, "put", lambda data, path, ct: storage.StoredImage(
+        path=path, url=f"https://store/public/{path}", content_type=ct, bytes=1))
+
+    pid = create(client)
+    r = client.post(f"/posts/{pid}/image/card", data={"headline": "STILL A CARD"})
+    assert r.status_code == 303
+    db.expire_all()
+    assert len(db.get(Post, pid).images) == 1
 
 
 def test_an_uploaded_non_image_is_refused_with_a_message(client, db):
@@ -405,7 +456,7 @@ def test_an_uploaded_non_image_is_refused_with_a_message(client, db):
 
 def test_replacing_an_image_removes_the_old_file(client, db, monkeypatch):
     """The row cascade does not reach the bucket; the old file must be deleted
-    explicitly or it is orphaned forever."""
+explicitly or it is orphaned forever."""
     deleted: list[str] = []
     monkeypatch.setattr(storage, "delete", lambda path: deleted.append(path))
     monkeypatch.setattr(storage, "path_from_url", lambda url: url.rsplit("public/", 1)[-1])

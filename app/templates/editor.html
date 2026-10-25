@@ -89,6 +89,21 @@
           </button>
         </form>
 
+        {# A branded card: the picture is generated, the words are drawn, so
+           they are the words that were written. Costs no allowance. #}
+        <details class="cardform">
+          <summary>Make a branded card</summary>
+          <form method="post" action="/posts/{{ post.id }}/image/card">{{ csrf(request) }}
+            <input type="text" name="eyebrow" placeholder="PRODUCT SPOTLIGHT">
+            <input type="text" name="headline" value="{{ post.topic }}"
+                   placeholder="headline — a line starting | is drawn in green" required>
+            <input type="text" name="subhead" placeholder="supporting line">
+            <textarea name="features" rows="4"
+                      placeholder="One per line:&#10;Keeps food separate | No mixing in transit&#10;Catering ready | Built for volume"></textarea>
+            <button class="btn btn-ghost" type="submit">Make card</button>
+          </form>
+        </details>
+
         <form method="get" action="/posts/{{ post.id }}#photos" class="imgrow">
           <input type="text" name="q" value="{{ photo_query }}" placeholder="search stock photos">
           <button class="btn btn-ghost" type="submit">Find photos</button>

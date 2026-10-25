@@ -17,13 +17,13 @@ import re
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import text
 
 from app import auth, limits, llm
 from app.csrf import HEADER
 from app.database import SessionLocal
 from app.main import app
 from app.models import ModelUsed, Post, User
+from tests.conftest import purge_users
 
 pytestmark = pytest.mark.integration
 
@@ -46,9 +46,7 @@ def _purge():
     s = SessionLocal()
 
     def purge():
-        s.rollback()
-        s.execute(text("DELETE FROM users WHERE linkedin_person_urn LIKE 'urn:li:person:form%'"))
-        s.commit()
+        purge_users("form", s)
 
     purge()
     yield

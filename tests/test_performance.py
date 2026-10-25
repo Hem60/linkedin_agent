@@ -18,6 +18,7 @@ from app import auth, performance
 from app.database import SessionLocal
 from app.main import app
 from app.models import ImageSource, Post, PostCategory, PostStatus, Tone, User
+from tests.conftest import purge_users
 
 UTC = dt.UTC
 SUB = "perfUserA"
@@ -68,9 +69,7 @@ def _purge(request):
     s = SessionLocal()
 
     def purge():
-        s.rollback()
-        s.execute(text("DELETE FROM users WHERE linkedin_person_urn LIKE 'urn:li:person:perf%'"))
-        s.commit()
+        purge_users("perf", s)
 
     purge()
     yield

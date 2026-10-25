@@ -29,6 +29,7 @@ from app.models import (
     User,
 )
 from app.privacy import export_data
+from tests.conftest import purge_users
 
 SUB = "privacyUserA"
 OTHER = "privacyUserB"
@@ -52,9 +53,7 @@ def _purge(request):
     s = SessionLocal()
 
     def purge():
-        s.rollback()
-        s.execute(text("DELETE FROM users WHERE linkedin_person_urn LIKE 'urn:li:person:privacy%'"))
-        s.commit()
+        purge_users("privacy", s)
 
     purge()
     yield

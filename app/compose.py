@@ -26,6 +26,7 @@ from app import (
     llm,
     performance,
     photos,
+    postcard,
     publisher,
     sanitize,
     scheduling,
@@ -334,6 +335,64 @@ def generate_image(post_id: int, q: str = Form(""),
         return RedirectResponse(
             f"/posts/{post.id}?m={urllib.parse.quote(str(exc))}", status_code=303)
     return RedirectResponse(f"/posts/{post.id}?m=image#preview", status_code=303)
+
+
+@router.post("/posts/{post_id}/image/card")
+def generate_card(post_id: int,
+                  headline: str = Form(""),
+                  eyebrow: str = Form(""),
+                  subhead: str = Form(""),
+                  features: str = Form(""),
+                  user: User = Depends(require_user),
+                  db: Session = Depends(get_db)):
+    """Draw a branded card for this post.
+
+    The picture is generated or already attached; the words are drawn, so they
+    are the words that were written rather than a model's impression of them.
+    A headline is the only thing required -- everything else is optional, and
+    an empty card is still a usable one.
+
+    Features arrive one per line as "Label | detail", which is the smallest
+    thing to type that still gives the two-level layout the references use.
+    """
+    post = _own_post(db, user, post_id)
+    if post.status not in EDITABLE:
+        raise HTTPException(400, "Only drafts can be edited.")
+
+    parsed: list[postcard.Feature] = []
+    for line in features.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        label, _, detail = line.partition("|")
+        parsed.append(postcard.Feature(label.strip(), detail.strip()))
+
+    # Reuse the picture already on the post when there is one: the card is a
+    # frame around it, and regenerating would spend allowance to no purpose.
+    hero: bytes | None = None
+    try:
+        if post.images:
+            hero = storage.fetch(post.images[0].url)
+        else:
+            hero = imagegen.generate(post.photo_query or headline, styled=True)
+    except (imagegen.ImageGenError, storage.StorageError) as exc:
+        log.info("card hero unavailable, drawing without one: %s", exc)
+
+    try:
+        card = postcard.Card(
+            headline=headline or post.topic or "",
+            eyebrow=eyebrow,
+            subhead=subhead,
+            features=parsed,
+            brand=user.company_name or "",
+            contacts=[c for c in (user.company_page_url or "").split(",") if c][:3],
+        )
+        prepared = uploads.prepare_upload(postcard.render(card, hero))
+        _attach(db, post, prepared, ImageSource.card, user)
+    except (postcard.PostcardError, uploads.ImageRejected, storage.StorageError) as exc:
+        return RedirectResponse(
+            f"/posts/{post.id}?m={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(f"/posts/{post.id}?m=card#preview", status_code=303)
 
 
 @router.post("/posts/{post_id}/image/upload")
