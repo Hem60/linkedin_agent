@@ -21,6 +21,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app import (
+    cardwriter,
     imagegen,
     limits,
     llm,
@@ -370,32 +371,62 @@ def generate_card(post_id: int,
         label, _, detail = line.partition("|")
         parsed.append(postcard.Feature(label.strip(), detail.strip()))
 
+    # With nothing typed, the card writes itself from the post. Everything the
+    # form asks for is already in the draft, and asking someone to retype it is
+    # work the system has the material to do. Anything that *was* typed wins:
+    # the automatic version is a starting point, not a ruling.
+    written: postcard.Card | None = None
+    auto_subject = ""
+    if not headline.strip():
+        source = post.content or post.topic or ""
+        try:
+            written, auto_subject = cardwriter.write(source)
+        except cardwriter.CardWriteError as exc:
+            return RedirectResponse(
+                f"/posts/{post.id}?m={urllib.parse.quote(str(exc))}", status_code=303)
+
+    # Two of the arrangements lift the product off a plain ground, and
+    # feathering the edge of a photograph only reads as a cut-out when there is
+    # nothing in the corners to fade away.
+    layout = written.layout if written else "feature"
+    plain = layout in ("product", "spotlight")
+
     # The picture has to be of what the card says. Reusing whatever was already
     # attached put a photograph of a code editor on a card about exporting
     # peanuts, because the draft's photo_query had been written for a different
     # post. So the subject comes from the card: what was typed for the picture,
     # or failing that the headline, and only then the draft's own query.
-    subject = photo_subject.strip() or headline.strip() or post.photo_query or ""
-    reuse = bool(post.images) and not photo_subject.strip() and not headline.strip()
+    subject = (photo_subject.strip() or auto_subject
+               or headline.strip() or post.photo_query or "")
+    # Only reuse an existing picture when the card was not written for this
+    # post: a card the model just described deserves a picture of what it
+    # describes, not whatever happened to be attached earlier.
+    reuse = (bool(post.images) and written is None
+             and not photo_subject.strip() and not headline.strip())
 
     hero: bytes | None = None
     try:
         if reuse:
             hero = storage.fetch(post.images[0].url)
         elif subject:
-            hero = imagegen.generate(subject, styled=True)
+            hero = imagegen.generate(subject, styled=True, plain=plain)
     except (imagegen.ImageGenError, storage.StorageError) as exc:
         log.info("card hero unavailable, drawing without one: %s", exc)
 
     try:
         card = postcard.Card(
+            layout=layout,
             # No fallback to post.topic: that is the instruction someone typed
             # to get a draft -- "write the post for import peanut" -- and it
             # went straight onto the card as its headline.
-            headline=headline.strip(),
-            eyebrow=eyebrow.strip(),
-            subhead=subhead.strip(),
-            features=parsed,
+            headline=headline.strip() or (written.headline if written else ""),
+            eyebrow=eyebrow.strip() or (written.eyebrow if written else ""),
+            subhead=subhead.strip() or (written.subhead if written else ""),
+            features=parsed or (written.features if written else []),
+            body=written.body if written else "",
+            columns=written.columns if written else [],
+            badges=written.badges if written else [],
+            tagline=written.tagline if written else "",
             brand=(brand or user.company_name or "").strip(),
             contacts=[c.strip() for c in contacts.split(",") if c.strip()][:3],
         )

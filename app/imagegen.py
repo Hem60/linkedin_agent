@@ -60,7 +60,16 @@ class ImageGenError(Exception):
     """Cloudflare could not be reached, or refused the request."""
 
 
-def compose_prompt(subject: str, *, styled: bool = True) -> str:
+# A product standing on a plain ground, for the card layouts that lift the
+# photograph off the page. Feathering the edge of a photograph only reads as a
+# cut-out if there is nothing in the corners to fade away.
+PLAIN = (
+    "single product centred on a plain seamless off-white studio background, "
+    "soft even shadow beneath, product photography, nothing else in frame"
+)
+
+
+def compose_prompt(subject: str, *, styled: bool = True, plain: bool = False) -> str:
     """Build the prompt actually sent to the model.
 
     `styled` is the difference between the two callers. The draft's photo_query
@@ -71,10 +80,12 @@ def compose_prompt(subject: str, *, styled: bool = True) -> str:
     cleaned = " ".join(subject.split())[:MAX_SUBJECT_CHARS]
     if not cleaned:
         return ""
+    if plain:
+        return f"{cleaned}. {PLAIN}"
     return f"{cleaned}. {STYLE}" if styled else cleaned
 
 
-def generate(subject: str, *, styled: bool = True) -> bytes:
+def generate(subject: str, *, styled: bool = True, plain: bool = False) -> bytes:
     """Generate one landscape image for a post, returning the raw bytes.
 
     Raises ImageGenError with a message meant for the user. An empty subject
@@ -84,7 +95,7 @@ def generate(subject: str, *, styled: bool = True) -> bytes:
     s = get_settings()
     s.require("cloudflare_account_id", "cloudflare_api_token")
 
-    prompt = compose_prompt(subject, styled=styled)
+    prompt = compose_prompt(subject, styled=styled, plain=plain)
     if not prompt:
         raise ImageGenError("Describe the image you want first.")
 

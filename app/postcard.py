@@ -37,6 +37,7 @@ FOOTER_H = 104
 
 _FONTS = Path(__file__).resolve().parent / "static" / "fonts"
 _REG, _BOLD = _FONTS / "DejaVuSans.ttf", _FONTS / "DejaVuSans-Bold.ttf"
+_ICONS = _FONTS / "MaterialSymbolsOutlined.ttf"
 
 
 class PostcardError(Exception):
@@ -72,10 +73,27 @@ class Card:
     """
 
     headline: str
+    # Which of the three arrangements to draw. The references are not
+    # variations on one card: a comparison of two things and a product with a
+    # list of claims want genuinely different furniture, and forcing either
+    # into the other's layout is what makes a template look like a template.
+    #   "feature" -- photograph behind, claims down the right
+    #   "split"   -- photograph left, words and claims right
+    #   "compare" -- centred headline, two labelled columns
+    layout: str = "feature"
     eyebrow: str = ""
     subhead: str = ""
+    # The reference runs a bold line under the headline and then a short
+    # paragraph under that -- a claim, then the explanation of it.
+    body: str = ""
     features: list[Feature] = field(default_factory=list)
+    # Short labels for the strip above the footer: two or three words each,
+    # the row of small reassurances every reference finishes with.
+    badges: list[Feature] = field(default_factory=list)
+    # The two sides of a comparison card: a label, a name and a line each.
+    columns: list[Feature] = field(default_factory=list)
     brand: str = ""
+    tagline: str = ""
     contacts: list[str] = field(default_factory=list)
     palette: Palette = field(default_factory=Palette)
 
@@ -109,43 +127,44 @@ def _wrap(draw: ImageDraw.ImageDraw, text: str, fnt, max_w: float) -> list[str]:
 # icon set, and keeps the card to one dependency the project already has.
 # ---------------------------------------------------------------------------
 
-def _icon(d: ImageDraw.ImageDraw, kind: str, box: tuple[int, int, int, int], colour) -> None:
-    x0, y0, x1, y1 = box
-    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
-    r = (x1 - x0) / 2
+# Material Symbols, drawn as glyphs rather than shapes.
+#
+# These were hand-drawn with Pillow primitives first, and it showed: a leaf
+# built from a pie slice and a line does not sit beside real typography. A
+# font renders at any size with proper curves and consistent stroke weight,
+# and Pillow can draw font glyphs without the native libraries SVG would need
+# -- which matters, because Render is not this laptop.
+#
+# Names are the project's, codepoints are Material's, taken from the published
+# list rather than guessed.
+_GLYPHS = {
+    "leaf": "",       # eco
+    "drop": "",       # water_drop
+    "shield": "",     # verified_user
+    "globe": "",      # public
+    "recycle": "",    # recycling
+    "temp": "",       # device_thermostat
+    "ship": "",       # local_shipping
+    "box": "",        # inventory_2
+    "bolt": "",       # bolt
+    "growth": "",     # trending_up
+    "people": "",     # groups
+    "clock": "",      # schedule
+    "check": "",      # check_circle
+}
 
-    if kind == "leaf":
-        d.pieslice([cx - r, cy - r, cx + r, cy + r], 180, 300, fill=colour)
-        d.line([cx - r * 0.5, cy + r * 0.4, cx + r * 0.5, cy - r * 0.5],
-               fill=colour, width=3)
-    elif kind == "shield":
-        d.polygon([(cx, cy - r), (cx + r * 0.8, cy - r * 0.5),
-                   (cx + r * 0.6, cy + r * 0.7), (cx, cy + r),
-                   (cx - r * 0.6, cy + r * 0.7), (cx - r * 0.8, cy - r * 0.5)],
-                  outline=colour, width=3)
-        d.line([cx - r * 0.35, cy, cx - r * 0.05, cy + r * 0.3], fill=colour, width=4)
-        d.line([cx - r * 0.05, cy + r * 0.3, cx + r * 0.45, cy - r * 0.35],
-               fill=colour, width=4)
-    elif kind == "drop":
-        d.polygon([(cx, cy - r), (cx + r * 0.75, cy + r * 0.25), (cx, cy + r * 0.85),
-                   (cx - r * 0.75, cy + r * 0.25)], outline=colour, width=3)
-    elif kind == "globe":
-        d.ellipse([cx - r * 0.85, cy - r * 0.85, cx + r * 0.85, cy + r * 0.85],
-                  outline=colour, width=3)
-        d.ellipse([cx - r * 0.35, cy - r * 0.85, cx + r * 0.35, cy + r * 0.85],
-                  outline=colour, width=3)
-        d.line([cx - r * 0.85, cy, cx + r * 0.85, cy], fill=colour, width=3)
-    elif kind == "recycle":
-        for angle in (0, 120, 240):
-            d.arc([cx - r * 0.8, cy - r * 0.8, cx + r * 0.8, cy + r * 0.8],
-                  angle + 10, angle + 90, fill=colour, width=5)
-    elif kind == "temp":
-        d.rounded_rectangle([cx - r * 0.22, cy - r * 0.85, cx + r * 0.22, cy + r * 0.35],
-                            radius=int(r * 0.22), outline=colour, width=3)
-        d.ellipse([cx - r * 0.45, cy + r * 0.2, cx + r * 0.45, cy + r],
-                  outline=colour, width=3)
-    else:  # a dot is better than a crash
-        d.ellipse([cx - r * 0.4, cy - r * 0.4, cx + r * 0.4, cy + r * 0.4], fill=colour)
+ICON_NAMES = tuple(_GLYPHS)
+
+
+def _icon(d: ImageDraw.ImageDraw, kind: str, box: tuple[int, int, int, int], colour) -> None:
+    """Draw one icon centred in `box`."""
+    x0, y0, x1, y1 = box
+    size = max(12, int(min(x1 - x0, y1 - y0)))
+    glyph = _GLYPHS.get(kind, _GLYPHS["leaf"])
+    font = _font(_ICONS, size)
+    # anchor="mm" puts the glyph's middle on the point, which is what makes a
+    # row of different icons line up rather than wobble.
+    d.text(((x0 + x1) / 2, (y0 + y1) / 2), glyph, font=font, fill=colour, anchor="mm")
 
 
 def _cover(img: Image.Image, size: tuple[int, int]) -> Image.Image:
@@ -158,98 +177,723 @@ def _cover(img: Image.Image, size: tuple[int, int]) -> Image.Image:
     return img.crop((left, top, left + tw, top + th))
 
 
-def render(card: Card, photo: bytes | None = None) -> bytes:
+def _scrim(size: tuple[int, int], palette: Palette, stop: float) -> Image.Image:
+    """A cream veil over the top of the photograph, fading out by `stop`.
+
+    The reference overlays its headline directly on the picture. That only
+    stays legible if the picture is bright where the words are, and a
+    generated photograph is not reliably anything. So the ground colour is
+    laid over the top as a gradient: solid enough at the crown to read dark
+    green type against, gone by the time the product appears.
+    """
+    w, h = size
+    veil = Image.new("RGBA", (1, h))
+    px = veil.load()
+    edge = max(1, int(h * stop))
+    for y in range(h):
+        if y >= edge:
+            px[0, y] = (*palette.ground, 0)
+        else:
+            # Hold near-solid for the first third, then ease away.
+            t = y / edge
+            alpha = 247 if t < 0.34 else int(247 * (1 - (t - 0.34) / 0.66) ** 1.35)
+            px[0, y] = (*palette.ground, max(0, min(247, alpha)))
+    return veil.resize((w, h))
+
+
+def _render_feature(card: Card, photo: bytes | None) -> bytes:
     """Draw the card and return JPEG bytes, ready for the same upload path a
-    generated image takes."""
+    generated image takes.
+
+    The photograph is the background, not a panel inside the layout. That is
+    the single thing that makes the reference read as designed rather than
+    assembled, and everything else here sits on top of it.
+    """
     p = card.palette
-    canvas = Image.new("RGB", (W, H), p.ground)
-
-    # A soft wash behind the upper half, as the references have.
-    wash = Image.new("RGB", (W, H), p.ground)
-    ImageDraw.Draw(wash).ellipse([-280, -560, 820, 520], fill=p.wash)
-    canvas.paste(wash.filter(ImageFilter.GaussianBlur(110)), (0, 0))
-    d = ImageDraw.Draw(canvas)
-
-    y = MARGIN
-
-    # --- brand -------------------------------------------------------------
-    if card.brand:
-        bf = _font(_BOLD, 26)
-        d.text((MARGIN, y), card.brand, font=bf, fill=p.dark)
-        y += 52
-
-    # --- eyebrow -----------------------------------------------------------
-    if card.eyebrow:
-        ef = _font(_BOLD, 22)
-        tw = d.textlength(card.eyebrow, font=ef)
-        d.rounded_rectangle([MARGIN, y, MARGIN + tw + 48, y + 46], radius=23, fill=p.dark)
-        d.text((MARGIN + 24, y + 12), card.eyebrow, font=ef, fill=p.white)
-        y += 70
-
-    # --- headline ----------------------------------------------------------
-    hf = _font(_BOLD, 64)
-    for raw in card.headline.split("\n"):
-        accent = raw.startswith("|")
-        text = raw[1:] if accent else raw
-        for line in _wrap(d, text, hf, W - MARGIN * 2):
-            d.text((MARGIN, y), line, font=hf, fill=p.accent if accent else p.dark)
-            y += 74
-    y += 6
-
-    if card.subhead:
-        sf = _font(_REG, 28)
-        for line in _wrap(d, card.subhead, sf, W - MARGIN * 2)[:3]:
-            d.text((MARGIN, y), line, font=sf, fill=p.muted)
-            y += 38
-    y += 24
-
-    # --- photo and features ------------------------------------------------
-    # The space left over after the text is given to the picture, so a long
-    # headline shrinks the photograph rather than colliding with the footer.
-    available = H - FOOTER_H - 40 - y
-    # Two to a row, so the space they need is half the count rounded up.
-    shown = min(len(card.features), 4)
-    feature_h = 96 * ((shown + 1) // 2)
-    photo_h = max(260, available - (feature_h + 28 if card.features else 0))
 
     if photo:
         try:
             img = Image.open(io.BytesIO(photo)).convert("RGB")
         except OSError as exc:
             raise PostcardError("That photo could not be read.") from exc
-        hero = _cover(img, (W - MARGIN * 2, int(photo_h)))
-        mask = Image.new("L", hero.size, 0)
-        ImageDraw.Draw(mask).rounded_rectangle([0, 0, hero.size[0] - 1, hero.size[1] - 1],
-                                               radius=30, fill=255)
-        canvas.paste(hero, (MARGIN, int(y)), mask)
+        canvas = _cover(img, (W, H))
     else:
-        d.rounded_rectangle([MARGIN, y, W - MARGIN, y + photo_h], radius=30,
-                            fill=(226, 222, 208))
-    y += photo_h + 28
+        canvas = Image.new("RGB", (W, H), p.ground)
+        wash = Image.new("RGB", (W, H), p.ground)
+        ImageDraw.Draw(wash).ellipse([-280, -560, 820, 520], fill=p.wash)
+        canvas = Image.blend(canvas, wash.filter(ImageFilter.GaussianBlur(110)), 0.9)
 
+    canvas = canvas.convert("RGBA")
+    canvas.alpha_composite(_scrim((W, H), p, 0.62))
+    canvas = canvas.convert("RGB")
+    d = ImageDraw.Draw(canvas)
+
+    y = MARGIN
+
+    # --- eyebrow -----------------------------------------------------------
+    if card.eyebrow:
+        ef = _font(_BOLD, 21)
+        tw = d.textlength(card.eyebrow, font=ef)
+        d.rounded_rectangle([MARGIN, y, MARGIN + tw + 44, y + 42], radius=21, fill=p.dark)
+        d.text((MARGIN + 22, y + 10), card.eyebrow, font=ef, fill=p.white)
+        y += 60
+
+    # --- headline ----------------------------------------------------------
+    # Mixed case and large, as the reference sets it. Capitals shout where the
+    # original speaks, and at this size they also wrap far sooner.
+    #
+    # The size is chosen, not fixed: a headline the model wrote is whatever
+    # length it is, and at a fixed 70pt "Without a Trace." fell onto a third
+    # line while the reference holds two. So the type steps down until each
+    # written line fits on one drawn line -- which is what a designer does,
+    # and keeps the block the shape the layout expects.
+    text_w = 640
+    written = [raw.removeprefix("|")
+               for raw in card.headline.splitlines()]
+    size = 70
+    while size > 40:
+        hf = _font(_BOLD, size)
+        if all(d.textlength(line, font=hf) <= text_w for line in written if line):
+            break
+        size -= 2
+    hf = _font(_BOLD, size)
+    line_h = int(size * 1.12)
+
+    for raw in card.headline.splitlines():
+        accent = raw.startswith("|")
+        line_text = raw[1:] if accent else raw
+        for line in _wrap(d, line_text, hf, text_w):
+            d.text((MARGIN, y), line, font=hf, fill=p.accent if accent else p.dark)
+            y += line_h
+
+    # The short rule the reference draws under the headline.
+    y += 8
+    d.line([MARGIN, y, MARGIN + 92, y], fill=p.accent, width=6)
+    y += 30
+
+    if card.subhead:
+        sf = _font(_BOLD, 31)
+        for line in _wrap(d, card.subhead, sf, text_w)[:2]:
+            d.text((MARGIN, y), line, font=sf, fill=p.dark)
+            y += 42
+        y += 6
+
+    if card.body:
+        bf = _font(_REG, 24)
+        for line in _wrap(d, card.body, bf, text_w - 40)[:3]:
+            d.text((MARGIN, y), line, font=bf, fill=p.muted)
+            y += 33
+
+    # --- features down the right -------------------------------------------
+    # White discs with a ring, not flat tints: on a photograph a flat circle
+    # disappears, and the ring is what the reference uses to hold them.
     if card.features:
-        lf, df = _font(_BOLD, 25), _font(_REG, 20)
-        col_w = (W - MARGIN * 2) // 2
-        for i, feat in enumerate(card.features[:4]):
-            cx = MARGIN + (i % 2) * col_w
-            cy = y + (i // 2) * 96
-            d.ellipse([cx, cy, cx + 62, cy + 62], fill=p.wash)
-            _icon(d, feat.icon, (cx + 16, cy + 16, cx + 46, cy + 46), p.dark)
-            d.text((cx + 78, cy + 6), feat.label, font=lf, fill=p.dark)
-            if feat.detail:
-                for j, line in enumerate(_wrap(d, feat.detail, df, col_w - 96)[:2]):
-                    d.text((cx + 78, cy + 36 + j * 24), line, font=df, fill=p.muted)
+        shown = card.features[:5]
+        col_x = W - MARGIN - 300
+        top = MARGIN + 54
+        slot = min(104, (H - FOOTER_H - 300 - top) / max(1, len(shown)))
+        lf = _font(_BOLD, 22)
+
+        for i, feat in enumerate(shown):
+            cy = top + i * slot + slot / 2
+            if i:
+                d.line([col_x + 86, cy - slot / 2, W - MARGIN, cy - slot / 2],
+                       fill=(255, 255, 255, 90), width=2)
+
+            d.ellipse([col_x, cy - 33, col_x + 66, cy + 33], fill=p.white,
+                      outline=p.dark, width=3)
+            _icon(d, feat.icon, (col_x + 18, cy - 15, col_x + 48, cy + 15), p.dark)
+
+            lines = _wrap(d, feat.label, lf, 214)[:2]
+            ty = cy - (len(lines) * 26) / 2
+            for line in lines:
+                d.text((col_x + 86, ty), line, font=lf, fill=p.dark)
+                ty += 26
+
+    # --- badge strip above the footer --------------------------------------
+    if card.badges:
+        strip_h = 128
+        sy = H - FOOTER_H - strip_h - 26
+        d.rounded_rectangle([MARGIN - 20, sy, W - MARGIN + 20, sy + strip_h],
+                            radius=22, fill=p.ground)
+        shown = card.badges[:5]
+        slot = (W - (MARGIN - 20) * 2 - 40) / len(shown)
+        bf = _font(_BOLD, 18)
+        for i, badge in enumerate(shown):
+            cx = MARGIN + i * slot + slot / 2
+            _icon(d, badge.icon, (cx - 19, sy + 22, cx + 19, sy + 60), p.dark)
+            if i:
+                d.line([cx - slot / 2, sy + 24, cx - slot / 2, sy + strip_h - 24],
+                       fill=p.wash, width=2)
+            ty = sy + 72
+            for line in _wrap(d, badge.label, bf, slot - 26)[:2]:
+                lw = d.textlength(line, font=bf)
+                d.text((cx - lw / 2, ty), line, font=bf, fill=p.dark)
+                ty += 23
 
     # --- footer ------------------------------------------------------------
     d.rectangle([0, H - FOOTER_H, W, H], fill=p.dark)
-    if card.contacts:
-        cf = _font(_REG, 22)
-        slot = W // len(card.contacts)
+    fy = H - FOOTER_H
+
+    if card.tagline:
+        tf = _font(_REG, 23)
+        d.ellipse([MARGIN, fy + 30, MARGIN + 44, fy + 74], outline=p.accent, width=3)
+        _icon(d, "leaf", (MARGIN + 11, fy + 41, MARGIN + 33, fy + 63), p.accent)
+        # Stop before the brand block. A tagline the model wrote is whatever
+        # length it is, and a long one ran straight through the contact line.
+        room = W - MARGIN * 2 - 60 - (380 if card.brand else 0)
+        line = _wrap(d, card.tagline, tf, room)[:1]
+        if line:
+            d.text((MARGIN + 60, fy + 40), line[0], font=tf, fill=p.white)
+
+    if card.brand:
+        bf = _font(_BOLD, 30)
+        bw = d.textlength(card.brand, font=bf)
+        d.text((W - MARGIN - bw, fy + 26), card.brand, font=bf, fill=p.white)
+        if card.contacts:
+            cf = _font(_REG, 19)
+            line = "  ·  ".join(card.contacts[:3])
+            cw = d.textlength(line, font=cf)
+            d.text((W - MARGIN - cw, fy + 66), line, font=cf, fill=p.accent)
+    elif card.contacts:
+        cf = _font(_REG, 21)
+        slot = W // len(card.contacts[:3])
         for i, text in enumerate(card.contacts[:3]):
-            x = i * slot + 40
-            d.ellipse([x, H - 70, x + 34, H - 36], outline=p.accent, width=3)
-            d.text((x + 48, H - 64), text, font=cf, fill=p.white)
+            d.text((i * slot + 48, fy + 40), text, font=cf, fill=p.white)
 
     out = io.BytesIO()
     canvas.save(out, "JPEG", quality=92, optimize=True)
     return out.getvalue()
+
+
+def _footer(d: ImageDraw.ImageDraw, card: Card) -> None:
+    """The dark bar every reference finishes with."""
+    p = card.palette
+    d.rectangle([0, H - FOOTER_H, W, H], fill=p.dark)
+    fy = H - FOOTER_H
+
+    if card.tagline:
+        tf = _font(_REG, 23)
+        d.ellipse([MARGIN, fy + 30, MARGIN + 44, fy + 74], outline=p.accent, width=3)
+        _icon(d, "leaf", (MARGIN + 11, fy + 41, MARGIN + 33, fy + 63), p.accent)
+        d.text((MARGIN + 60, fy + 40), card.tagline, font=tf, fill=p.white)
+
+    if card.brand:
+        bf = _font(_BOLD, 30)
+        bw = d.textlength(card.brand, font=bf)
+        d.text((W - MARGIN - bw, fy + 26), card.brand, font=bf, fill=p.white)
+        if card.contacts:
+            cf = _font(_REG, 19)
+            line = "   ".join(card.contacts[:3])
+            cw = d.textlength(line, font=cf)
+            d.text((W - MARGIN - cw, fy + 66), line, font=cf, fill=p.accent)
+    elif card.contacts:
+        cf = _font(_REG, 21)
+        slot = W // len(card.contacts[:3])
+        for i, text in enumerate(card.contacts[:3]):
+            d.text((i * slot + 48, fy + 40), text, font=cf, fill=p.white)
+
+
+def _fitted(d: ImageDraw.ImageDraw, lines: list[str], width: float,
+            start: int, floor: int = 38):
+    """The largest bold size at which every line still fits on one line."""
+    size = start
+    while size > floor:
+        f = _font(_BOLD, size)
+        if all(d.textlength(line, font=f) <= width for line in lines if line):
+            break
+        size -= 2
+    return _font(_BOLD, size), int(size * 1.12)
+
+
+def _open_photo(photo: bytes) -> Image.Image:
+    try:
+        return Image.open(io.BytesIO(photo)).convert("RGB")
+    except OSError as exc:
+        raise PostcardError("That photo could not be read.") from exc
+
+
+def _render_split(card: Card, photo: bytes | None) -> bytes:
+    """Photograph down the left, words and claims on the right.
+
+    The arrangement two of the references use for a product spotlight. The
+    picture runs off the left edge rather than sitting in a box, which is what
+    stops it reading as a slide.
+    """
+    p = card.palette
+    canvas = Image.new("RGB", (W, H), p.white)
+    d = ImageDraw.Draw(canvas)
+
+    photo_w = 548
+    if photo:
+        canvas.paste(_cover(_open_photo(photo), (photo_w, H - FOOTER_H)), (0, 0))
+    else:
+        d.rectangle([0, 0, photo_w, H - FOOTER_H], fill=p.wash)
+
+    # A soft disc behind the picture's edge, as the references use to join the
+    # photograph to the page rather than letting it stop on a hard line.
+    disc = Image.new("RGB", (W, H), p.white)
+    ImageDraw.Draw(disc).ellipse([photo_w - 340, -220, photo_w + 300, 620], fill=p.wash)
+    canvas.paste(Image.blend(canvas.crop((photo_w, 0, W, H)),
+                             disc.crop((photo_w, 0, W, H)), 0.55), (photo_w, 0))
+    d = ImageDraw.Draw(canvas)
+
+    x = photo_w + 56
+    col_w = W - x - MARGIN
+    y = MARGIN + 34
+
+    if card.eyebrow:
+        ef = _font(_BOLD, 21)
+        tw = d.textlength(card.eyebrow, font=ef)
+        d.rounded_rectangle([x, y, x + tw + 36, y + 40], radius=10, fill=p.wash)
+        d.text((x + 18, y + 9), card.eyebrow, font=ef, fill=p.dark)
+        y += 58
+
+    written = [raw.removeprefix("|")
+               for raw in card.headline.splitlines()]
+    hf, line_h = _fitted(d, written, col_w, 58)
+    for raw in card.headline.splitlines():
+        accent = raw.startswith("|")
+        for line in _wrap(d, raw[1:] if accent else raw, hf, col_w):
+            d.text((x, y), line, font=hf, fill=p.accent if accent else p.ink)
+            y += line_h
+
+    y += 10
+    d.line([x, y, x + 74, y], fill=p.accent, width=5)
+    y += 28
+
+    if card.body:
+        bf = _font(_REG, 23)
+        for line in _wrap(d, card.body, bf, col_w)[:4]:
+            d.text((x, y), line, font=bf, fill=p.muted)
+            y += 32
+        y += 24
+
+    if card.features:
+        lf = _font(_BOLD, 22)
+        for feat in card.features[:4]:
+            d.ellipse([x, y, x + 62, y + 62], outline=p.accent, width=3)
+            _icon(d, feat.icon, (x + 16, y + 16, x + 46, y + 46), p.dark)
+            lines = _wrap(d, feat.label.upper(), lf, col_w - 82)[:2]
+            ty = y + 31 - len(lines) * 13
+            for line in lines:
+                d.text((x + 82, ty), line, font=lf, fill=p.ink)
+                ty += 26
+            y += 84
+
+    _footer(d, card)
+    out = io.BytesIO()
+    canvas.save(out, "JPEG", quality=92, optimize=True)
+    return out.getvalue()
+
+
+def _render_compare(card: Card, photo: bytes | None) -> bytes:
+    """Centred headline over two labelled columns, photograph beneath.
+
+    For a post that sets two things against each other, which the reference
+    does with "One Crop. Two Outputs." A list of claims cannot say that, and
+    forcing a comparison into one is how a template starts misrepresenting
+    what was written.
+    """
+    p = card.palette
+    canvas = Image.new("RGB", (W, H), p.white)
+    d = ImageDraw.Draw(canvas)
+
+    y = MARGIN + 40
+    written = [raw.removeprefix("|")
+               for raw in card.headline.splitlines()]
+    hf, line_h = _fitted(d, written, W - MARGIN * 2, 76)
+    for raw in card.headline.splitlines():
+        accent = raw.startswith("|")
+        for line in _wrap(d, raw[1:] if accent else raw, hf, W - MARGIN * 2):
+            lw = d.textlength(line, font=hf)
+            d.text(((W - lw) / 2, y), line, font=hf, fill=p.accent if accent else p.ink)
+            y += line_h
+
+    y += 18
+    d.line([(W - 300) / 2, y, (W + 300) / 2, y], fill=p.ink, width=3)
+    y += 26
+
+    if card.body:
+        bf = _font(_BOLD, 26)
+        for line in _wrap(d, card.body, bf, 720)[:2]:
+            lw = d.textlength(line, font=bf)
+            d.text(((W - lw) / 2, y), line, font=bf, fill=p.ink)
+            y += 36
+    y += 36
+
+    pairs = (card.columns or card.features)[:2]
+    if pairs:
+        half = W / 2
+        lab, name, note = _font(_BOLD, 21), _font(_BOLD, 34), _font(_BOLD, 20)
+        for i, col in enumerate(pairs):
+            cx = MARGIN if i == 0 else half + 40
+            cw = half - MARGIN - 40
+            d.text((cx, y), f"Output {i + 1}", font=lab, fill=p.muted)
+            d.line([cx, y + 30, cx + 54, y + 30], fill=p.accent, width=4)
+            ty = y + 46
+            for line in _wrap(d, col.label, name, cw)[:2]:
+                d.text((cx, ty), line, font=name, fill=p.ink)
+                ty += 42
+            for line in _wrap(d, col.detail, note, cw)[:2]:
+                d.text((cx, ty + 4), line, font=note, fill=p.muted)
+                ty += 26
+        y += 190
+
+    if photo:
+        height = int(H - FOOTER_H - y)
+        if height > 80:
+            canvas.paste(_cover(_open_photo(photo), (W, height)), (0, int(y)))
+
+    _footer(ImageDraw.Draw(canvas), card)
+    out = io.BytesIO()
+    canvas.save(out, "JPEG", quality=92, optimize=True)
+    return out.getvalue()
+
+
+LAYOUTS = {
+    "feature": _render_feature,
+    "split": _render_split,
+    "compare": _render_compare,
+}
+
+
+def render(card: Card, photo: bytes | None = None) -> bytes:
+    """Draw the card in the arrangement its layout asks for."""
+    draw = LAYOUTS.get(card.layout, _render_feature)
+    return draw(card, photo)
+
+
+def _contact_bar(d: ImageDraw.ImageDraw, card: Card) -> None:
+    """The footer both of these references use: three contacts, each behind a
+    ringed icon, divided by thin vertical rules.
+
+    Different from `_footer`, which carries a tagline and a brand. This one is
+    all detail -- phone, email, site -- and the rules are what stop three
+    unrelated strings reading as one sentence.
+    """
+    p = card.palette
+    d.rectangle([0, H - FOOTER_H, W, H], fill=p.dark)
+    items = card.contacts[:3]
+    if not items:
+        return
+
+    mid = H - FOOTER_H / 2
+    slot = W / len(items)
+    cf = _font(_REG, 21)
+    glyphs = ("clock", "box", "globe")
+
+    for i, text in enumerate(items):
+        left = i * slot
+        if i:
+            d.line([left, mid - 26, left, mid + 26], fill=p.accent, width=2)
+        cx = left + 46
+        d.ellipse([cx - 19, mid - 19, cx + 19, mid + 19], outline=p.white, width=2)
+        _icon(d, glyphs[i % len(glyphs)], (cx - 11, mid - 11, cx + 11, mid + 11), p.white)
+        d.text((cx + 32, mid - 12), text, font=cf, fill=p.white)
+
+
+def _disc_icon(d: ImageDraw.ImageDraw, kind: str, cx: float, cy: float,
+               r: float, palette: Palette) -> None:
+    """A filled dark disc with a white glyph, as the references draw them.
+
+    An outlined circle disappears against a photograph; a filled one holds its
+    shape wherever it lands.
+    """
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=palette.dark)
+    _icon(d, kind, (cx - r * 0.5, cy - r * 0.5, cx + r * 0.5, cy + r * 0.5), palette.white)
+
+
+def _render_range(card: Card, photo: bytes | None) -> bytes:
+    """Claims down the left, product photograph filling the right.
+
+    The mirror of `split`, and the arrangement the reference uses when the
+    point is the breadth of what is on offer rather than one item: the eye
+    reads the list first and the picture confirms it.
+    """
+    p = card.palette
+    canvas = Image.new("RGB", (W, H), p.ground)
+    d = ImageDraw.Draw(canvas)
+
+    # The photograph occupies the right two-fifths, softened into the page by
+    # a wedge of ground colour rather than stopping at a straight edge.
+    if photo:
+        pw = 560
+        canvas.paste(_cover(_open_photo(photo), (pw, H - FOOTER_H)), (W - pw, 0))
+        fade = 190
+        veil = Image.new("RGBA", (fade, H - FOOTER_H), (0, 0, 0, 0))
+        vd = ImageDraw.Draw(veil)
+        for i in range(fade):
+            vd.line([i, 0, i, H], fill=(*p.ground, int(255 * (1 - i / fade) ** 1.2)))
+        canvas.paste(Image.alpha_composite(
+            canvas.crop((W - pw, 0, W - pw + fade, H - FOOTER_H)).convert("RGBA"), veil
+        ).convert("RGB"), (W - pw, 0))
+        d = ImageDraw.Draw(canvas)
+
+    y = MARGIN + 10
+
+    # A short note at the top right, set against a rule, as the reference has.
+    if card.tagline:
+        nf = _font(_REG, 20)
+        lines = _wrap(d, card.tagline, nf, 230)[:3]
+        d.line([W - MARGIN - 250, y + 2, W - MARGIN - 250, y + 6 + len(lines) * 26],
+               fill=p.dark, width=3)
+        ny = y
+        for line in lines:
+            d.text((W - MARGIN - 236, ny), line, font=nf, fill=p.dark)
+            ny += 26
+        y += 18
+
+    text_w = 560
+    written = [line.removeprefix("|") for line in card.headline.splitlines()]
+    hf, line_h = _fitted(d, written, text_w, 62)
+    for raw in card.headline.splitlines():
+        accent = raw.startswith("|")
+        for line in _wrap(d, raw.removeprefix("|"), hf, text_w):
+            d.text((MARGIN, y), line, font=hf, fill=p.accent if accent else p.dark)
+            y += line_h
+    y += 24
+
+    if card.features:
+        shown = card.features[:4]
+        lf, df = _font(_BOLD, 23), _font(_REG, 18)
+        # Spread down the column rather than bunching under the headline: at a
+        # fixed step four claims left a third of the card empty.
+        # A tight group, centred in what is left. Stretching them to fill the
+        # column put 200px between each and they stopped reading as one list;
+        # packing them under the headline left a dead band beneath. Centring
+        # the block spends the slack at both ends, where it looks deliberate.
+        step = 96
+        room = H - FOOTER_H - 90 - y
+        top = y + max(0, (room - len(shown) * step) / 2)
+        for i, feat in enumerate(shown):
+            fy = top + i * step
+            _disc_icon(d, feat.icon, MARGIN + 33, fy + 33, 33, p)
+            ty = fy + 8 if feat.detail else fy + 20
+            for line in _wrap(d, feat.label, lf, 330)[:2]:
+                d.text((MARGIN + 84, ty), line, font=lf, fill=p.dark)
+                ty += 26
+            if feat.detail:
+                for line in _wrap(d, feat.detail, df, 330)[:1]:
+                    d.text((MARGIN + 84, ty + 2), line, font=df, fill=p.muted)
+        y = top + len(shown) * step
+
+    if card.subhead:
+        # On the left, over the ground colour: at the right edge it sat on the
+        # photograph and vanished into it.
+        sf = _font(_BOLD, 19)
+        d.text((MARGIN, H - FOOTER_H - 46), card.subhead, font=sf, fill=p.muted)
+
+    _contact_bar(d, card)
+    out = io.BytesIO()
+    canvas.save(out, "JPEG", quality=92, optimize=True)
+    return out.getvalue()
+
+
+def _render_spotlight(card: Card, photo: bytes | None) -> bytes:
+    """One product, large, with its claims floating around it on discs.
+
+    The reference's product spotlight. The callouts sit over the photograph
+    rather than in a column, which is what makes it read as a picture of a
+    thing being pointed at rather than a list beside an image.
+    """
+    p = card.palette
+    canvas = Image.new("RGB", (W, H), p.ground)
+
+    if photo:
+        hero = _cover(_open_photo(photo), (W, H - FOOTER_H))
+        canvas.paste(hero, (0, 0))
+        canvas = canvas.convert("RGBA")
+        canvas.alpha_composite(_scrim((W, H), p, 0.46))
+        canvas = canvas.convert("RGB")
+    d = ImageDraw.Draw(canvas)
+
+    y = MARGIN
+    if card.eyebrow:
+        ef = _font(_BOLD, 21)
+        tw = d.textlength(card.eyebrow, font=ef)
+        x = W - MARGIN - tw - 44
+        d.rounded_rectangle([x, y, x + tw + 44, y + 42], radius=21, fill=p.dark)
+        d.text((x + 22, y + 10), card.eyebrow, font=ef, fill=p.white)
+        y += 62
+
+    # The headline sits right, away from the product, and is set as large as
+    # it will go -- the reference leads with the product name at display size.
+    written = [line.removeprefix("|") for line in card.headline.splitlines()]
+    hf, line_h = _fitted(d, written, 500, 84, floor=46)
+    for raw in card.headline.splitlines():
+        accent = raw.startswith("|")
+        for line in _wrap(d, raw.removeprefix("|"), hf, 500):
+            lw = d.textlength(line, font=hf)
+            d.text((W - MARGIN - lw, y), line, font=hf,
+                   fill=p.accent if accent else p.dark)
+            y += line_h
+
+    if card.subhead:
+        sf = _font(_BOLD, 21)
+        for line in _wrap(d, card.subhead, sf, 460)[:2]:
+            lw = d.textlength(line, font=sf)
+            d.text((W - MARGIN - lw, y + 6), line, font=sf, fill=p.muted)
+            y += 30
+
+    # Callouts down the left, each a disc with its label beside it, stepped in
+    # so they trace the edge of the product rather than forming a column.
+    if card.features:
+        shown = card.features[:3]
+        lf = _font(_BOLD, 22)
+        top = y + 90
+        for i, feat in enumerate(shown):
+            cx = MARGIN + 44 + (i % 2) * 70
+            cy = top + i * 150
+            lines = _wrap(d, feat.label, lf, 220)[:2]
+            # A pill behind the words. Dark green on a photograph of anything
+            # busy is unreadable, and these land wherever the picture happens
+            # to be -- the reference sets its callouts on a light ground for
+            # the same reason.
+            tw = max(d.textlength(line, font=lf) for line in lines)
+            box_h = len(lines) * 26 + 16
+            d.rounded_rectangle(
+                [cx + 30, cy - box_h / 2, cx + 66 + tw + 18, cy + box_h / 2],
+                radius=box_h / 2, fill=p.ground)
+            _disc_icon(d, feat.icon, cx, cy, 40, p)
+            ty = cy - len(lines) * 13 + 2
+            for line in lines:
+                d.text((cx + 56, ty), line, font=lf, fill=p.dark)
+                ty += 26
+
+    if card.body:
+        bf = _font(_BOLD, 19)
+        bw = d.textlength(card.body, font=bf)
+        by = H - FOOTER_H - 46
+        d.rounded_rectangle([(W - bw) / 2 - 22, by - 8, (W + bw) / 2 + 22, by + 32],
+                            radius=20, fill=p.ground)
+        d.text(((W - bw) / 2, by), card.body, font=bf, fill=p.dark)
+
+    _contact_bar(d, card)
+    out = io.BytesIO()
+    canvas.save(out, "JPEG", quality=92, optimize=True)
+    return out.getvalue()
+
+
+LAYOUTS.update({"range": _render_range, "spotlight": _render_spotlight})
+
+
+# The product card is square, unlike the rest. The reference is, and a square
+# is the other shape LinkedIn shows uncropped, so the layout keeps its own
+# size rather than being squeezed into the 4:5 the others use.
+PW, PH = 1080, 1080
+PFOOTER = 104
+
+
+def _feathered(img: Image.Image, size: tuple[int, int], ground) -> Image.Image:
+    """The photograph with its edges dissolved into the ground colour.
+
+    The reference has the product cut out and standing on the cream. Cutting
+    a subject out of an arbitrary generated photograph needs segmentation we
+    do not have, so this does the next honest thing: an elliptical feather
+    that fades the frame away. The product still reads as sitting on the page
+    rather than inside a window, which is the effect that mattered.
+    """
+    w, h = size
+    hero = _cover(img, size)
+    mask = Image.new("L", (w, h), 0)
+    # Inside the panel, not past it. Drawn larger than the frame the blur had
+    # nothing to work on and the photograph kept four hard edges -- the exact
+    # window effect this exists to avoid.
+    ImageDraw.Draw(mask).ellipse([w * 0.06, h * 0.05, w * 0.94, h * 0.95], fill=255)
+    mask = mask.filter(ImageFilter.GaussianBlur(w * 0.09))
+    plate = Image.new("RGB", (w, h), ground)
+    plate.paste(hero, (0, 0), mask)
+    return plate
+
+
+def _render_product(card: Card, photo: bytes | None) -> bytes:
+    """Square product card: photograph left, name and claims right.
+
+    Matches the reference's product spotlight -- the eyebrow in a pale pill,
+    the name set large in capitals, and four claims each behind a big soft
+    disc. The furniture is lighter than the other layouts because the product
+    is doing the work and everything else is a label on it.
+    """
+    p = card.palette
+    canvas = Image.new("RGB", (PW, PH), p.ground)
+    d = ImageDraw.Draw(canvas)
+
+    # --- product, left ------------------------------------------------------
+    if photo:
+        panel = _feathered(_open_photo(photo), (600, 720), p.ground)
+        canvas.paste(panel, (-40, 150))
+        d = ImageDraw.Draw(canvas)
+
+    x = 600
+    col_w = PW - x - 48
+    y = 58
+
+    # --- eyebrow ------------------------------------------------------------
+    if card.eyebrow:
+        ef = _font(_BOLD, 22)
+        spaced = " ".join(card.eyebrow)        # the reference letter-spaces it
+        tw = d.textlength(spaced, font=ef)
+        d.rounded_rectangle([x, y, x + tw + 52, y + 46], radius=23, fill=p.wash)
+        d.text((x + 26, y + 11), spaced, font=ef, fill=p.dark)
+        y += 70
+
+    # --- name ---------------------------------------------------------------
+    # Capitals here, unlike the others: this is a product name, and the
+    # reference sets it as a label rather than a sentence.
+    written = [line.removeprefix("|").upper() for line in card.headline.splitlines()]
+    hf, line_h = _fitted(d, written, col_w, 58, floor=34)
+    for line in written:
+        d.text((x, y), line, font=hf, fill=p.dark)
+        y += line_h
+
+    if card.subhead:
+        sf = _font(_BOLD, 23)
+        for line in _wrap(d, card.subhead, sf, col_w)[:2]:
+            d.text((x, y + 6), line, font=sf, fill=p.ink)
+            y += 32
+    y += 34
+
+    # --- claims -------------------------------------------------------------
+    if card.features:
+        shown = card.features[:4]
+        lf = _font(_BOLD, 24)
+        room = PH - PFOOTER - 40 - y
+        step = min(126, max(96, room / len(shown)))
+        for i, feat in enumerate(shown):
+            cy = y + i * step + step / 2
+            # A large pale disc, as the reference draws them -- the icon sits
+            # inside it rather than beside the words.
+            d.ellipse([x, cy - 46, x + 92, cy + 46], fill=p.wash)
+            _icon(d, feat.icon, (x + 24, cy - 22, x + 68, cy + 22), p.dark)
+            lines = _wrap(d, feat.label, lf, col_w - 112)[:2]
+            ty = cy - len(lines) * 14
+            for line in lines:
+                d.text((x + 112, ty), line, font=lf, fill=p.ink)
+                ty += 28
+
+    # --- footer -------------------------------------------------------------
+    d.rectangle([0, PH - PFOOTER, PW, PH], fill=p.dark)
+    items = card.contacts[:3]
+    if items:
+        mid = PH - PFOOTER / 2
+        slot = PW / len(items)
+        cf = _font(_REG, 20)
+        glyphs = ("clock", "box", "globe")
+        for i, text in enumerate(items):
+            left = i * slot
+            if i:
+                d.line([left, mid - 26, left, mid + 26], fill=p.accent, width=2)
+            cx = left + 46
+            # White filled discs with a dark glyph, which is what the
+            # reference uses -- an outline would vanish on the dark bar.
+            d.ellipse([cx - 20, mid - 20, cx + 20, mid + 20], fill=p.white)
+            _icon(d, glyphs[i % len(glyphs)], (cx - 11, mid - 11, cx + 11, mid + 11), p.dark)
+            d.text((cx + 34, mid - 11), text, font=cf, fill=p.white)
+
+    out = io.BytesIO()
+    canvas.save(out, "JPEG", quality=92, optimize=True)
+    return out.getvalue()
+
+
+LAYOUTS["product"] = _render_product

@@ -808,3 +808,6 @@ footer { text-align: center; padding: 56px 0 0; font-size: 13px; color: var(--mu
 .cardform button { justify-self: start; }
 .cardform .cardrow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 @media (max-width: 560px) { .cardform .cardrow { grid-template-columns: 1fr; } }
+.cardform .cardauto { display: flex; align-items: center; gap: 12px; margin: 4px 0 2px; }
+.cardform .cardauto .muted { font-size: 13px; }
+.cardform .cardor { font-size: 13px; margin: 10px 0 2px; }

@@ -78,23 +78,29 @@ def test_a_long_headline_shrinks_the_photo_rather_than_running_into_the_footer()
     )
     img = opened(render(long_card, photo_bytes()))
 
-    # The footer band should still be its own solid dark colour at the bottom.
-    band = [img.getpixel((x, H - 20)) for x in range(100, W - 100, 120)]
-    assert len({p for p in band}) == 1, f"footer is not a clean band: {set(band)}"
+    # The very bottom of the card belongs to the footer, whatever the headline
+    # did above it. Sampled below the contact line, which legitimately draws
+    # text inside the band.
+    from app.postcard import Palette
+    dark = Palette().dark
+    band = [img.getpixel((x, H - 5)) for x in range(60, W - 60, 90)]
+    assert all(px == dark for px in band), f"content reached the footer: {set(band)}"
 
 
 def test_the_footer_is_drawn_for_every_card():
+    from app.postcard import Palette
     img = opened(render(a_card(), photo_bytes()))
-    assert img.getpixel((10, H - 10)) == img.getpixel((W - 10, H - 10))
+    assert img.getpixel((10, H - 5)) == Palette().dark
 
 
 def test_more_features_than_fit_are_dropped_not_overflowed():
     """Four is what the grid holds. A fifth should be left out rather than
     drawn over the footer."""
+    from app.postcard import Palette
     many = a_card(features=[Feature(f"Feature {i}", "detail", "leaf") for i in range(8)])
     img = opened(render(many, photo_bytes()))
-    band = [img.getpixel((x, H - 20)) for x in range(100, W - 100, 120)]
-    assert len({p for p in band}) == 1
+    band = [img.getpixel((x, H - 5)) for x in range(60, W - 60, 90)]
+    assert all(px == Palette().dark for px in band)
 
 
 # ---------------------------------------------------------------------------

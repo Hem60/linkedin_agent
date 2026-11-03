@@ -93,12 +93,20 @@
            they are the words that were written. Costs no allowance. #}
         <details class="cardform">
           <summary>Make a branded card</summary>
+          {# The common case is the empty one: press the button and the card is
+             written from the post. The fields below are an override for when
+             the words matter more than the convenience. #}
+          <form method="post" action="/posts/{{ post.id }}/image/card" class="cardauto">{{ csrf(request) }}
+            <button class="btn btn-primary" type="submit">Write the card for me</button>
+            <span class="muted">reads this post and designs the card</span>
+          </form>
+          <p class="muted cardor">or write it yourself</p>
           <form method="post" action="/posts/{{ post.id }}/image/card">{{ csrf(request) }}
             <input type="text" name="eyebrow" placeholder="eyebrow, e.g. PRODUCT SPOTLIGHT">
             {# Deliberately not prefilled with post.topic: that is the
                instruction typed to get a draft, and it went onto a card as its
                headline -- "write the post for import peanut". #}
-            <input type="text" name="headline" required
+            <input type="text" name="headline"
                    placeholder="headline — put | at the start of a line for green">
             <input type="text" name="subhead" placeholder="supporting line under the headline">
             <textarea name="features" rows="4"
