@@ -13,6 +13,11 @@ card showing it is not a generated approximation of something similar. A
 certification here is one the company holds, so naming it is reporting rather
 than inventing.
 
+peanut-product2 is deliberately absent and has been removed: it is a sample
+shot on a workbench with a handwritten "Bold" label in frame. The brief asks
+for premium minimal commercial imagery, and a card is not the place for
+somebody's QC note.
+
 Only what has been seen goes in. Entries are deliberately absent for the
 photographs nobody has identified yet: an unlabelled file is not product data,
 and guessing what a picture shows is the failure this module exists to stop.
@@ -69,6 +74,15 @@ PRODUCTS: tuple[Product, ...] = (
         photo="bio-product4.jpg",
         describes="two plain moulded fibre round plates, plain white background",
         keywords=("plate", "plates", "tableware", "bagasse", "crockery"),
+    ),
+    Product(
+        key="groundnut-java",
+        name="Java Groundnut Kernels",
+        line="groundnut",
+        photo="peanut-product3.jpg",
+        describes="shelled red-skin groundnut kernels heaped on a plain white "
+                  "surface",
+        keywords=("java", "kernel", "kernels", "shelled", "blanched"),
     ),
     Product(
         key="groundnut-inshell",
