@@ -60,7 +60,7 @@ PRODUCTS: tuple[Product, ...] = (
         photo="bio-product1.jpg",
         describes="two moulded fibre round plates with three compartments, "
                   "plain white background",
-        keywords=("compartment", "plate", "tableware", "separation", "thali"),
+        keywords=("compartment", "compartments", "plate", "plates", "thali"),
     ),
     Product(
         key="plate-plain",
@@ -68,7 +68,7 @@ PRODUCTS: tuple[Product, ...] = (
         line="bagasse",
         photo="bio-product4.jpg",
         describes="two plain moulded fibre round plates, plain white background",
-        keywords=("plate", "tableware", "disposable", "round"),
+        keywords=("plate", "plates", "tableware", "bagasse", "crockery"),
     ),
     Product(
         key="groundnut-inshell",
@@ -76,7 +76,7 @@ PRODUCTS: tuple[Product, ...] = (
         line="groundnut",
         photo="peanut-product1.jpg",
         describes="raw in-shell groundnuts scattered on a plain white surface",
-        keywords=("peanut", "groundnut", "nut", "export", "raw", "shell"),
+        keywords=("peanut", "peanuts", "groundnut", "groundnuts"),
     ),
 )
 
@@ -98,6 +98,18 @@ def match(text: str) -> Product | None:
         if hits and (best is None or hits > best[0]):
             best = (hits, product)
     return best[1] if best else None
+
+
+# Words that say nothing about which product this is. "export" was a keyword
+# on the groundnuts and duly matched a post about biodegradable packaging,
+# which would have put the wrong product in front of a buyer -- the precise
+# failure the literal matcher was supposed to prevent. A keyword has to name
+# the thing, not the trade it travels in.
+_TOO_GENERIC = frozenset({
+    "export", "exports", "import", "imports", "raw", "shell", "bulk",
+    "product", "products", "goods", "packaging", "material", "materials",
+    "shipment", "shipments", "quality", "eco", "green", "sustainable",
+})
 
 
 def photo_bytes(product: Product) -> bytes | None:

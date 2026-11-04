@@ -218,17 +218,30 @@ def _render_feature(card: Card, photo: bytes | None) -> bytes:
             raise PostcardError("That photo could not be read.") from exc
         canvas = _cover(img, (W, H))
     else:
+        # No photograph: a spent allowance costs the picture, not the card.
+        # The wash has to carry the whole canvas on its own, so it is drawn
+        # across the full height rather than as a crown above a photograph --
+        # otherwise the lower two thirds are a flat empty band, which is what
+        # a card with nothing in it looked like in production.
         canvas = Image.new("RGB", (W, H), p.ground)
         wash = Image.new("RGB", (W, H), p.ground)
-        ImageDraw.Draw(wash).ellipse([-280, -560, 820, 520], fill=p.wash)
-        canvas = Image.blend(canvas, wash.filter(ImageFilter.GaussianBlur(110)), 0.9)
+        wd = ImageDraw.Draw(wash)
+        wd.ellipse([-300, -520, 880, 560], fill=p.wash)
+        wd.ellipse([W - 520, H - 880, W + 420, H + 160], fill=p.wash)
+        canvas = Image.blend(canvas, wash.filter(ImageFilter.GaussianBlur(130)), 0.95)
 
     canvas = canvas.convert("RGBA")
     canvas.alpha_composite(_scrim((W, H), p, 0.62))
     canvas = canvas.convert("RGB")
     d = ImageDraw.Draw(canvas)
 
-    y = MARGIN
+    # With a photograph the words sit in the top third and the picture fills
+    # the rest. Without one there is nothing to fill it, so the text starts
+    # lower and the claims spread -- otherwise the card is a paragraph with
+    # six hundred empty pixels under it, which is what production produced
+    # the first time the allowance ran out.
+    has_photo = photo is not None
+    y = MARGIN if has_photo else MARGIN + 150
 
     # --- eyebrow -----------------------------------------------------------
     if card.eyebrow:
@@ -290,8 +303,9 @@ def _render_feature(card: Card, photo: bytes | None) -> bytes:
     if card.features:
         shown = card.features[:5]
         col_x = W - MARGIN - 300
-        top = MARGIN + 54
-        slot = min(104, (H - FOOTER_H - 300 - top) / max(1, len(shown)))
+        top = (MARGIN + 54) if has_photo else (MARGIN + 170)
+        room = H - FOOTER_H - (300 if has_photo else 190) - top
+        slot = min(104 if has_photo else 150, room / max(1, len(shown)))
         lf = _font(_BOLD, 22)
 
         for i, feat in enumerate(shown):
