@@ -241,7 +241,8 @@ def _render_feature(card: Card, photo: bytes | None) -> bytes:
     # six hundred empty pixels under it, which is what production produced
     # the first time the allowance ran out.
     has_photo = photo is not None
-    y = MARGIN if has_photo else MARGIN + 150
+    head_y = _brand_header(d, canvas, card, W, compact=True, on_photo=has_photo)
+    y = head_y if has_photo else head_y + 90
 
     # --- eyebrow -----------------------------------------------------------
     if card.eyebrow:
@@ -303,7 +304,7 @@ def _render_feature(card: Card, photo: bytes | None) -> bytes:
     if card.features:
         shown = card.features[:5]
         col_x = W - MARGIN - 300
-        top = (MARGIN + 54) if has_photo else (MARGIN + 170)
+        top = head_y + (54 if has_photo else 110)
         room = H - FOOTER_H - (300 if has_photo else 190) - top
         slot = min(104 if has_photo else 150, room / max(1, len(shown)))
         lf = _font(_BOLD, 22)
@@ -353,31 +354,31 @@ def _render_feature(card: Card, photo: bytes | None) -> bytes:
         tf = _font(_REG, 23)
         d.ellipse([MARGIN, fy + 30, MARGIN + 44, fy + 74], outline=p.accent, width=3)
         _icon(d, "leaf", (MARGIN + 11, fy + 41, MARGIN + 33, fy + 63), p.accent)
-        # Stop before the brand block. A tagline the model wrote is whatever
-        # length it is, and a long one ran straight through the contact line.
-        room = W - MARGIN * 2 - 60 - (380 if card.brand else 0)
+        # Stop before the contact line. A tagline the model wrote is whatever
+        # length it is, and a long one ran straight through it.
+        room = W - MARGIN * 2 - 60 - _contacts_width(d, card) - 40
         line = _wrap(d, card.tagline, tf, room)[:1]
         if line:
             d.text((MARGIN + 60, fy + 40), line[0], font=tf, fill=p.white)
 
-    if card.brand:
-        bf = _font(_BOLD, 30)
-        bw = d.textlength(card.brand, font=bf)
-        d.text((W - MARGIN - bw, fy + 26), card.brand, font=bf, fill=p.white)
-        if card.contacts:
-            cf = _font(_REG, 19)
-            line = "  ·  ".join(card.contacts[:3])
-            cw = d.textlength(line, font=cf)
-            d.text((W - MARGIN - cw, fy + 66), line, font=cf, fill=p.accent)
-    elif card.contacts:
-        cf = _font(_REG, 21)
-        slot = W // len(card.contacts[:3])
-        for i, text in enumerate(card.contacts[:3]):
-            d.text((i * slot + 48, fy + 40), text, font=cf, fill=p.white)
+    # No brand name here. It is in the header at the top of every layout now,
+    # and printed twice on one card it read as a mistake rather than a motif.
+    if card.contacts:
+        cf = _font(_REG, 19)
+        line = "  ·  ".join(card.contacts[:3])
+        cw = d.textlength(line, font=cf)
+        d.text((W - MARGIN - cw, fy + 42), line, font=cf, fill=p.accent)
 
     out = io.BytesIO()
     canvas.save(out, "JPEG", quality=92, optimize=True)
     return out.getvalue()
+
+
+def _contacts_width(d: ImageDraw.ImageDraw, card: Card) -> float:
+    """How much of the footer the contact line will take."""
+    if not card.contacts:
+        return 0.0
+    return d.textlength("  ·  ".join(card.contacts[:3]), font=_font(_REG, 19))
 
 
 def _footer(d: ImageDraw.ImageDraw, card: Card) -> None:
@@ -390,22 +391,18 @@ def _footer(d: ImageDraw.ImageDraw, card: Card) -> None:
         tf = _font(_REG, 23)
         d.ellipse([MARGIN, fy + 30, MARGIN + 44, fy + 74], outline=p.accent, width=3)
         _icon(d, "leaf", (MARGIN + 11, fy + 41, MARGIN + 33, fy + 63), p.accent)
-        d.text((MARGIN + 60, fy + 40), card.tagline, font=tf, fill=p.white)
+        room = W - MARGIN * 2 - 60 - _contacts_width(d, card) - 40
+        line = _wrap(d, card.tagline, tf, room)[:1]
+        if line:
+            d.text((MARGIN + 60, fy + 40), line[0], font=tf, fill=p.white)
 
-    if card.brand:
-        bf = _font(_BOLD, 30)
-        bw = d.textlength(card.brand, font=bf)
-        d.text((W - MARGIN - bw, fy + 26), card.brand, font=bf, fill=p.white)
-        if card.contacts:
-            cf = _font(_REG, 19)
-            line = "   ".join(card.contacts[:3])
-            cw = d.textlength(line, font=cf)
-            d.text((W - MARGIN - cw, fy + 66), line, font=cf, fill=p.accent)
-    elif card.contacts:
-        cf = _font(_REG, 21)
-        slot = W // len(card.contacts[:3])
-        for i, text in enumerate(card.contacts[:3]):
-            d.text((i * slot + 48, fy + 40), text, font=cf, fill=p.white)
+    # No brand name here. It is in the header at the top of every layout now,
+    # and printed twice on one card it read as a mistake rather than a motif.
+    if card.contacts:
+        cf = _font(_REG, 19)
+        line = "  ·  ".join(card.contacts[:3])
+        cw = d.textlength(line, font=cf)
+        d.text((W - MARGIN - cw, fy + 42), line, font=cf, fill=p.accent)
 
 
 def _fitted(d: ImageDraw.ImageDraw, lines: list[str], width: float,
@@ -471,12 +468,20 @@ def _trim(img: Image.Image, tol: int = 244) -> Image.Image:
 
 
 def _brand_header(d: ImageDraw.ImageDraw, canvas: Image.Image, card: Card,
-                  width: int, y: int = MARGIN) -> int:
+                  width: int, y: int = MARGIN, compact: bool = False,
+                  on_photo: bool = False) -> int:
     """The band across the top: logo left, brand name right, tagline beneath.
 
     The rule under the names runs the full width on purpose. Everything below
     it is two columns, and a line drawn across both is what says they are one
     card rather than two things that happen to be side by side.
+
+    `compact` leaves the tagline out, for the layouts that already print it
+    somewhere else -- the photograph-backed ones carry it in the dark footer,
+    and printing it twice on one card is worse than not printing it at all.
+
+    `on_photo` is for those same layouts: the rule is drawn in the brand's
+    dark green rather than the pale wash, which disappears over a photograph.
 
     Returns the y to carry on from.
     """
@@ -503,8 +508,11 @@ def _brand_header(d: ImageDraw.ImageDraw, canvas: Image.Image, card: Card,
                font=bf, fill=p.dark)
 
     y += size + 22
-    d.line([MARGIN, y, width - MARGIN, y], fill=p.wash, width=3)
+    d.line([MARGIN, y, width - MARGIN, y],
+           fill=p.dark if on_photo else p.wash, width=3)
     y += 28
+    if compact:
+        return y - 6
 
     # Set large. It is the line the post is actually making, and at 21pt under
     # a 32pt brand name it read as a caption on the logo rather than a
@@ -643,7 +651,7 @@ def _render_compare(card: Card, photo: bytes | None) -> bytes:
     canvas = Image.new("RGB", (W, H), p.white)
     d = ImageDraw.Draw(canvas)
 
-    y = MARGIN + 40
+    y = _brand_header(d, canvas, card, W, compact=True) + 18
     written = [raw.removeprefix("|")
                for raw in card.headline.splitlines()]
     hf, line_h = _fitted(d, written, W - MARGIN * 2, 76)
@@ -761,32 +769,24 @@ def _render_range(card: Card, photo: bytes | None) -> bytes:
 
     # The photograph occupies the right two-fifths, softened into the page by
     # a wedge of ground colour rather than stopping at a straight edge.
+    # The header owns the top of the card, so the photograph starts under it
+    # rather than at y=0 -- it used to run up behind the brand name.
+    head_y = _brand_header(d, canvas, card, W)
+
     if photo:
-        pw = 560
-        canvas.paste(_cover(_open_photo(photo), (pw, H - FOOTER_H)), (W - pw, 0))
+        pw, ph = 560, H - FOOTER_H - head_y
+        canvas.paste(_cover(_open_photo(photo), (pw, ph)), (W - pw, head_y))
         fade = 190
-        veil = Image.new("RGBA", (fade, H - FOOTER_H), (0, 0, 0, 0))
+        veil = Image.new("RGBA", (fade, ph), (0, 0, 0, 0))
         vd = ImageDraw.Draw(veil)
         for i in range(fade):
-            vd.line([i, 0, i, H], fill=(*p.ground, int(255 * (1 - i / fade) ** 1.2)))
+            vd.line([i, 0, i, ph], fill=(*p.ground, int(255 * (1 - i / fade) ** 1.2)))
         canvas.paste(Image.alpha_composite(
-            canvas.crop((W - pw, 0, W - pw + fade, H - FOOTER_H)).convert("RGBA"), veil
-        ).convert("RGB"), (W - pw, 0))
+            canvas.crop((W - pw, head_y, W - pw + fade, head_y + ph)).convert("RGBA"),
+            veil).convert("RGB"), (W - pw, head_y))
         d = ImageDraw.Draw(canvas)
 
-    y = MARGIN + 10
-
-    # A short note at the top right, set against a rule, as the reference has.
-    if card.tagline:
-        nf = _font(_REG, 20)
-        lines = _wrap(d, card.tagline, nf, 230)[:3]
-        d.line([W - MARGIN - 250, y + 2, W - MARGIN - 250, y + 6 + len(lines) * 26],
-               fill=p.dark, width=3)
-        ny = y
-        for line in lines:
-            d.text((W - MARGIN - 236, ny), line, font=nf, fill=p.dark)
-            ny += 26
-        y += 18
+    y = head_y + 8
 
     text_w = 560
     written = [line.removeprefix("|") for line in card.headline.splitlines()]
@@ -852,7 +852,7 @@ def _render_spotlight(card: Card, photo: bytes | None) -> bytes:
         canvas = canvas.convert("RGB")
     d = ImageDraw.Draw(canvas)
 
-    y = MARGIN
+    y = _brand_header(d, canvas, card, W, compact=True, on_photo=photo is not None)
     if card.eyebrow:
         ef = _font(_BOLD, 21)
         tw = d.textlength(card.eyebrow, font=ef)
@@ -906,12 +906,19 @@ def _render_spotlight(card: Card, photo: bytes | None) -> bytes:
                 ty += 26
 
     if card.body:
+        # Wrapped. Set as one line it was as wide as the model's sentence
+        # happened to be, and ran off both edges of the card.
         bf = _font(_BOLD, 19)
-        bw = d.textlength(card.body, font=bf)
-        by = H - FOOTER_H - 46
-        d.rounded_rectangle([(W - bw) / 2 - 22, by - 8, (W + bw) / 2 + 22, by + 32],
+        lines = _wrap(d, card.body, bf, W - MARGIN * 2 - 80)[:2]
+        bw = max(d.textlength(line, font=bf) for line in lines)
+        by = H - FOOTER_H - 30 - len(lines) * 26
+        d.rounded_rectangle([(W - bw) / 2 - 22, by - 10,
+                             (W + bw) / 2 + 22, by + len(lines) * 26 + 6],
                             radius=20, fill=p.ground)
-        d.text(((W - bw) / 2, by), card.body, font=bf, fill=p.dark)
+        for line in lines:
+            lw = d.textlength(line, font=bf)
+            d.text(((W - lw) / 2, by), line, font=bf, fill=p.dark)
+            by += 26
 
     _contact_bar(d, card)
     out = io.BytesIO()
@@ -963,15 +970,17 @@ def _render_product(card: Card, photo: bytes | None) -> bytes:
     canvas = Image.new("RGB", (PW, PH), p.ground)
     d = ImageDraw.Draw(canvas)
 
+    head_y = _brand_header(d, canvas, card, PW, compact=True)
+
     # --- product, left ------------------------------------------------------
     if photo:
         panel = _feathered(_open_photo(photo), (600, 720), p.ground)
-        canvas.paste(panel, (-40, 150))
+        canvas.paste(panel, (-40, head_y + 60))
         d = ImageDraw.Draw(canvas)
 
     x = 600
     col_w = PW - x - 48
-    y = 58
+    y = head_y + 10
 
     # --- eyebrow ------------------------------------------------------------
     if card.eyebrow:
@@ -1002,10 +1011,14 @@ def _render_product(card: Card, photo: bytes | None) -> bytes:
     if card.features:
         shown = card.features[:4]
         lf = _font(_BOLD, 24)
+        # Centred in the space left rather than stacked from the top: the
+        # header pushed everything down and the claims ended half way up the
+        # card with the bottom third empty.
         room = PH - PFOOTER - 40 - y
-        step = min(126, max(96, room / len(shown)))
+        step = 126
+        top = y + max(0, (room - len(shown) * step) / 2)
         for i, feat in enumerate(shown):
-            cy = y + i * step + step / 2
+            cy = top + i * step + step / 2
             # A large pale disc, as the reference draws them -- the icon sits
             # inside it rather than beside the words.
             d.ellipse([x, cy - 46, x + 92, cy + 46], fill=p.wash)

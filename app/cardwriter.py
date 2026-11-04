@@ -256,7 +256,12 @@ def write(post_text: str) -> tuple[postcard.Card, str]:
         eyebrow=_clean(data.get("eyebrow"), 26).upper(),
         subhead=("" if _unsupported(_clean(data.get("subhead"), 70), post_text)
                  else _clean(data.get("subhead"), 70)),
-        body=_clean(data.get("body"), 170),
+        # Vetted like the rest. It was not, and a card went out reading
+        # "Certified biodegradable materials decompose fully" -- the whole
+        # paragraph unchecked while every two-word feature beside it was
+        # being held to the post.
+        body=("" if _unsupported(_clean(data.get("body"), 170), post_text)
+              else _clean(data.get("body"), 170)),
         features=_vet(_features(data.get("features"), MAX_FEATURES), post_text),
         columns=_vet(columns, post_text),
         badges=_vet(_features(data.get("badges"), 5), post_text),

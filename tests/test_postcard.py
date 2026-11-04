@@ -127,3 +127,37 @@ def test_rendering_needs_no_network_and_no_api_key(monkeypatch):
     monkeypatch.setattr(httpx, "get", forbidden)
     monkeypatch.setattr(httpx, "post", forbidden)
     assert render(a_card(), photo_bytes())
+
+
+# ---------------------------------------------------------------------------
+# Every arrangement, not just the default
+#
+# The header was added to one layout at a time and the others kept rendering
+# the old way, so a card made in production carried no logo at all. These
+# draw each of them, with and without a photograph.
+# ---------------------------------------------------------------------------
+
+def test_every_layout_renders_at_the_feed_size():
+    from app.postcard import LAYOUTS
+    for name in LAYOUTS:
+        for photo in (photo_bytes(), None):
+            img = opened(render(a_card(layout=name, tagline="A short line."), photo))
+            assert (img.width, img.height) == (W, H), name
+
+
+def test_every_layout_draws_the_brand_header(monkeypatch):
+    """The header was added one layout at a time, and a layout that never got
+    it drew no logo at all in production. A pixel test cannot see this -- the
+    logo is drawn whether or not a brand name is set -- so this records who
+    actually called it."""
+    from app import postcard
+
+    called = []
+    original = postcard._brand_header
+    monkeypatch.setattr(postcard, "_brand_header",
+                        lambda *a, **k: called.append(True) or original(*a, **k))
+
+    for name in postcard.LAYOUTS:
+        called.clear()
+        render(a_card(layout=name), photo_bytes())
+        assert called, f"{name} never draws the brand header"
