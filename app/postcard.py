@@ -427,6 +427,56 @@ def _open_photo(photo: bytes) -> Image.Image:
         raise PostcardError("That photo could not be read.") from exc
 
 
+# The brand's own logo, when there is one. Drop a PNG with transparency at
+# app/static/brand/logo.png and every card picks it up; until then the mark
+# below stands in. Deliberately not an error when absent -- a missing logo
+# should cost a badge, not the card.
+LOGO_PATH = Path(__file__).resolve().parent / "static" / "brand" / "logo.png"
+
+
+def _brand_header(d: ImageDraw.ImageDraw, canvas: Image.Image, card: Card,
+                  width: int, y: int = 44, tag_w: int | None = None) -> int:
+    """Logo on the left, brand name on the right, tagline beneath.
+
+    `tag_w` is how much room the tagline has. It defaults to the full width,
+    but a two-column layout passes the left column's width: a tagline running
+    the whole way across sits on top of whatever the right column starts with,
+    which is exactly what it did.
+
+    Returns the y to carry on from.
+    """
+    p = card.palette
+    size = 76
+
+    if LOGO_PATH.exists():
+        try:
+            mark = Image.open(LOGO_PATH).convert("RGBA")
+            scale = size / max(mark.width, mark.height)
+            mark = mark.resize((max(1, round(mark.width * scale)),
+                                max(1, round(mark.height * scale))), Image.LANCZOS)
+            canvas.paste(mark, (MARGIN, y), mark)
+        except OSError:
+            LOGO_PATH.exists()      # unreadable file: fall through to the mark
+    else:
+        d.ellipse([MARGIN, y, MARGIN + size, y + size], outline=p.dark, width=3)
+        _icon(d, "leaf", (MARGIN + 17, y + 17, MARGIN + 47, y + 47), p.dark)
+
+    if card.brand:
+        bf = _font(_BOLD, 30)
+        bw = d.textlength(card.brand, font=bf)
+        d.text((width - MARGIN - bw, y + (size - 30) // 2), card.brand,
+               font=bf, fill=p.dark)
+
+    y += size + 16
+    if card.tagline:
+        tf = _font(_REG, 21)
+        room = (tag_w if tag_w else width) - MARGIN * 2
+        for line in _wrap(d, card.tagline, tf, room)[:2]:
+            d.text((MARGIN, y), line, font=tf, fill=p.muted)
+            y += 29
+    return y + 10
+
+
 def _render_split(card: Card, photo: bytes | None) -> bytes:
     """Photograph down the left, words and claims on the right.
 
@@ -438,11 +488,17 @@ def _render_split(card: Card, photo: bytes | None) -> bytes:
     canvas = Image.new("RGB", (W, H), p.white)
     d = ImageDraw.Draw(canvas)
 
+    # Header first: the logo and the brand name sit across the top, above both
+    # columns, with the post's own line under them. The product then runs down
+    # the left and its detail down the right.
     photo_w = 548
+    head_y = _brand_header(d, canvas, card, W, tag_w=photo_w)
+    photo_top = head_y + 6
     if photo:
-        canvas.paste(_cover(_open_photo(photo), (photo_w, H - FOOTER_H)), (0, 0))
+        canvas.paste(_cover(_open_photo(photo), (photo_w, H - FOOTER_H - photo_top)),
+                     (0, photo_top))
     else:
-        d.rectangle([0, 0, photo_w, H - FOOTER_H], fill=p.wash)
+        d.rectangle([0, photo_top, photo_w, H - FOOTER_H], fill=p.wash)
 
     # A soft disc behind the picture's edge, as the references use to join the
     # photograph to the page rather than letting it stop on a hard line.
@@ -454,7 +510,7 @@ def _render_split(card: Card, photo: bytes | None) -> bytes:
 
     x = photo_w + 56
     col_w = W - x - MARGIN
-    y = MARGIN + 34
+    y = photo_top + 10
 
     if card.eyebrow:
         ef = _font(_BOLD, 21)
@@ -495,7 +551,7 @@ def _render_split(card: Card, photo: bytes | None) -> bytes:
                 ty += 26
             y += 84
 
-    _footer(d, card)
+    _contact_bar(d, card)
     out = io.BytesIO()
     canvas.save(out, "JPEG", quality=92, optimize=True)
     return out.getvalue()
