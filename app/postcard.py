@@ -434,14 +434,49 @@ def _open_photo(photo: bytes) -> Image.Image:
 LOGO_PATH = Path(__file__).resolve().parent / "static" / "brand" / "logo.png"
 
 
-def _brand_header(d: ImageDraw.ImageDraw, canvas: Image.Image, card: Card,
-                  width: int, y: int = 44, tag_w: int | None = None) -> int:
-    """Logo on the left, brand name on the right, tagline beneath.
+def _contain(img: Image.Image, size: tuple[int, int]) -> Image.Image:
+    """Scale to fit inside `size` whole, as object-fit: contain does.
 
-    `tag_w` is how much room the tagline has. It defaults to the full width,
-    but a two-column layout passes the left column's width: a tagline running
-    the whole way across sits on top of whatever the right column starts with,
-    which is exactly what it did.
+    The counterpart to _cover, and the right one for a product. Cover crops
+    whatever will not fit, which on a catalogue photograph means slicing the
+    ends off the thing being sold.
+    """
+    tw, th = size
+    scale = min(tw / img.width, th / img.height)
+    return img.resize((max(1, round(img.width * scale)),
+                       max(1, round(img.height * scale))), Image.LANCZOS)
+
+
+def _trim(img: Image.Image, tol: int = 244) -> Image.Image:
+    """Crop the plain border off a catalogue photograph.
+
+    The product shots are shot on white with a generous margin, and inside a
+    panel that margin is drawn twice -- the photograph's and the layout's --
+    so the product ends up small in the middle of a lot of nothing.
+
+    Only trimmed when what is left is still most of the picture. A shot that
+    is mostly background, or one on a dark ground, is left alone rather than
+    cropped to something nobody chose.
+    """
+    grey = img.convert("L").point(lambda v: 0 if v >= tol else 255)
+    box = grey.getbbox()
+    if not box:
+        return img
+    w, h = box[2] - box[0], box[3] - box[1]
+    if w < img.width * 0.25 or h < img.height * 0.25:
+        return img
+    pad = round(min(w, h) * 0.04)
+    return img.crop((max(0, box[0] - pad), max(0, box[1] - pad),
+                     min(img.width, box[2] + pad), min(img.height, box[3] + pad)))
+
+
+def _brand_header(d: ImageDraw.ImageDraw, canvas: Image.Image, card: Card,
+                  width: int, y: int = MARGIN) -> int:
+    """The band across the top: logo left, brand name right, tagline beneath.
+
+    The rule under the names runs the full width on purpose. Everything below
+    it is two columns, and a line drawn across both is what says they are one
+    card rather than two things that happen to be side by side.
 
     Returns the y to carry on from.
     """
@@ -459,97 +494,136 @@ def _brand_header(d: ImageDraw.ImageDraw, canvas: Image.Image, card: Card,
             LOGO_PATH.exists()      # unreadable file: fall through to the mark
     else:
         d.ellipse([MARGIN, y, MARGIN + size, y + size], outline=p.dark, width=3)
-        _icon(d, "leaf", (MARGIN + 17, y + 17, MARGIN + 47, y + 47), p.dark)
+        _icon(d, "leaf", (MARGIN + 20, y + 20, MARGIN + 56, y + 56), p.dark)
 
     if card.brand:
-        bf = _font(_BOLD, 30)
+        bf = _font(_BOLD, 32)
         bw = d.textlength(card.brand, font=bf)
-        d.text((width - MARGIN - bw, y + (size - 30) // 2), card.brand,
+        d.text((width - MARGIN - bw, y + (size - 34) // 2), card.brand,
                font=bf, fill=p.dark)
 
-    y += size + 16
+    y += size + 22
+    d.line([MARGIN, y, width - MARGIN, y], fill=p.wash, width=3)
+    y += 28
+
+    # Set large. It is the line the post is actually making, and at 21pt under
+    # a 32pt brand name it read as a caption on the logo rather than a
+    # statement of its own.
     if card.tagline:
-        tf = _font(_REG, 21)
-        room = (tag_w if tag_w else width) - MARGIN * 2
-        for line in _wrap(d, card.tagline, tf, room)[:2]:
-            d.text((MARGIN, y), line, font=tf, fill=p.muted)
-            y += 29
-    return y + 10
+        tf, line_h = _fitted(d, [card.tagline], width - MARGIN * 2, 38, floor=26)
+        for line in _wrap(d, card.tagline, tf, width - MARGIN * 2)[:2]:
+            d.text((MARGIN, y), line, font=tf, fill=p.dark)
+            y += line_h + 4
+        y += 10
+    return y + 18
 
 
-def _render_split(card: Card, photo: bytes | None) -> bytes:
-    """Photograph down the left, words and claims on the right.
+def _split_column(d: ImageDraw.ImageDraw, card: Card, x: float, col_w: float,
+                  y: float, floor: float) -> float:
+    """Draw the detail column, and return the y it finished at.
 
-    The arrangement two of the references use for a product spotlight. The
-    picture runs off the left edge rather than sitting in a box, which is what
-    stops it reading as a slide.
+    Also used to measure. Called with a throwaway canvas it reports the height
+    the words need without drawing them, which is how the panel can be made
+    the size of its contents instead of a fixed height with the bottom third
+    empty -- which is what it was.
     """
     p = card.palette
-    canvas = Image.new("RGB", (W, H), p.white)
-    d = ImageDraw.Draw(canvas)
-
-    # Header first: the logo and the brand name sit across the top, above both
-    # columns, with the post's own line under them. The product then runs down
-    # the left and its detail down the right.
-    photo_w = 548
-    head_y = _brand_header(d, canvas, card, W, tag_w=photo_w)
-    photo_top = head_y + 6
-    if photo:
-        canvas.paste(_cover(_open_photo(photo), (photo_w, H - FOOTER_H - photo_top)),
-                     (0, photo_top))
-    else:
-        d.rectangle([0, photo_top, photo_w, H - FOOTER_H], fill=p.wash)
-
-    # A soft disc behind the picture's edge, as the references use to join the
-    # photograph to the page rather than letting it stop on a hard line.
-    disc = Image.new("RGB", (W, H), p.white)
-    ImageDraw.Draw(disc).ellipse([photo_w - 340, -220, photo_w + 300, 620], fill=p.wash)
-    canvas.paste(Image.blend(canvas.crop((photo_w, 0, W, H)),
-                             disc.crop((photo_w, 0, W, H)), 0.55), (photo_w, 0))
-    d = ImageDraw.Draw(canvas)
-
-    x = photo_w + 56
-    col_w = W - x - MARGIN
-    y = photo_top + 10
 
     if card.eyebrow:
-        ef = _font(_BOLD, 21)
+        ef = _font(_BOLD, 20)
         tw = d.textlength(card.eyebrow, font=ef)
-        d.rounded_rectangle([x, y, x + tw + 36, y + 40], radius=10, fill=p.wash)
-        d.text((x + 18, y + 9), card.eyebrow, font=ef, fill=p.dark)
-        y += 58
+        d.rounded_rectangle([x, y, x + tw + 34, y + 38], radius=10, fill=p.wash)
+        d.text((x + 17, y + 8), card.eyebrow, font=ef, fill=p.dark)
+        y += 54
 
-    written = [raw.removeprefix("|")
-               for raw in card.headline.splitlines()]
-    hf, line_h = _fitted(d, written, col_w, 58)
+    written = [raw.removeprefix("|") for raw in card.headline.splitlines()]
+    hf, line_h = _fitted(d, written, col_w, 50)
     for raw in card.headline.splitlines():
         accent = raw.startswith("|")
         for line in _wrap(d, raw[1:] if accent else raw, hf, col_w):
             d.text((x, y), line, font=hf, fill=p.accent if accent else p.ink)
             y += line_h
 
-    y += 10
+    y += 12
     d.line([x, y, x + 74, y], fill=p.accent, width=5)
-    y += 28
+    y += 26
 
     if card.body:
-        bf = _font(_REG, 23)
+        bf = _font(_REG, 22)
         for line in _wrap(d, card.body, bf, col_w)[:4]:
             d.text((x, y), line, font=bf, fill=p.muted)
-            y += 32
-        y += 24
+            y += 31
+        y += 18
 
-    if card.features:
-        lf = _font(_BOLD, 22)
-        for feat in card.features[:4]:
-            d.ellipse([x, y, x + 62, y + 62], outline=p.accent, width=3)
-            _icon(d, feat.icon, (x + 16, y + 16, x + 46, y + 46), p.dark)
-            lines = _wrap(d, feat.label.upper(), lf, col_w - 82)[:2]
-            ty = y + 31 - len(lines) * 13
-            for line in lines:
-                d.text((x + 82, ty), line, font=lf, fill=p.ink)
-                ty += 26
-            y += 84
+    lf = _font(_BOLD, 21)
+    for feat in card.features[:4]:
+        if y + 56 > floor:
+            break
+        d.ellipse([x, y, x + 56, y + 56], outline=p.accent, width=3)
+        _icon(d, feat.icon, (x + 15, y + 15, x + 41, y + 41), p.dark)
+        lines = _wrap(d, feat.label.upper(), lf, col_w - 74)[:2]
+        ty = y + 28 - len(lines) * 12
+        for line in lines:
+            d.text((x + 74, ty), line, font=lf, fill=p.ink)
+            ty += 25
+        y += 84
+    return y
+
+
+def _render_split(card: Card, photo: bytes | None) -> bytes:
+    """Header across the top, then one panel holding two columns.
+
+    One panel, not two. An earlier version gave each column its own card and
+    the result still read as two things side by side -- the gutter between
+    them was the same hard seam the version before it had, just in cream. A
+    single surface with a hairline down it is a grid; two surfaces are two
+    cards.
+
+    The panel is as tall as its contents, measured first. At a fixed height it
+    ended a third of the way up from the footer with nothing in the rest.
+
+    The product is contained rather than cropped to fill: smaller on the page
+    but whole, which a catalogue photograph has to be.
+    """
+    p = card.palette
+    canvas = Image.new("RGB", (W, H), p.ground)
+    d = ImageDraw.Draw(canvas)
+
+    head_y = _brand_header(d, canvas, card, W)
+
+    pad = 30
+    inner_w = W - MARGIN * 2 - pad * 2
+    left_w, gutter = 380, 44
+    right_w = inner_w - left_w - gutter
+    left_x = MARGIN + pad
+    right_x = left_x + left_w + gutter
+
+    top = head_y
+    bottom = H - FOOTER_H - 44
+
+    d.rounded_rectangle([MARGIN, top, W - MARGIN, bottom], radius=28, fill=p.white)
+
+    # Both columns centre on the same axis. Sizing the panel to its contents
+    # instead left a band of bare ground between it and the footer; filling
+    # the panel and hanging the words from the top left the same band inside
+    # it. Centred, what is spare is shared top and bottom and reads as margin.
+    measured = _split_column(ImageDraw.Draw(Image.new("RGB", (8, 8))), card,
+                             right_x, right_w, 0, 1e6)
+    y = top + max(pad, (bottom - top - measured) // 2)
+
+    if photo:
+        shot = _contain(_trim(_open_photo(photo)), (left_w, bottom - top - pad * 2))
+        canvas.paste(shot, (left_x + (left_w - shot.width) // 2,
+                            top + (bottom - top - shot.height) // 2))
+    else:
+        d.rounded_rectangle([left_x, top + pad, left_x + left_w, bottom - pad],
+                            radius=18, fill=p.wash)
+
+    # The hairline is the grid: it says the two columns belong to one card.
+    rule_x = left_x + left_w + gutter / 2
+    d.line([rule_x, top + 44, rule_x, bottom - 44], fill=p.wash, width=2)
+
+    _split_column(d, card, right_x, right_w, y, bottom - pad + 10)
 
     _contact_bar(d, card)
     out = io.BytesIO()
