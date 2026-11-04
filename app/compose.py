@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app import (
     cardwriter,
+    catalogue,
     imagegen,
     limits,
     llm,
@@ -405,8 +406,20 @@ def generate_card(post_id: int,
              and not photo_subject.strip() and not headline.strip())
 
     hero: bytes | None = None
+    # A photograph of the actual product beats a generated likeness of
+    # something similar, and the brand brief is explicit that a generated
+    # visual must not misrepresent the real thing. It also costs nothing and
+    # cannot run out of allowance.
+    catalogued = catalogue.match(f"{post.topic} {subject}")
+    if catalogued and not photo_subject.strip():
+        hero = catalogue.photo_bytes(catalogued)
+        if hero:
+            log.info("card using the catalogue photograph for %s", catalogued.key)
+
     try:
-        if reuse:
+        if hero:
+            pass
+        elif reuse:
             hero = storage.fetch(post.images[0].url)
         elif subject:
             hero = imagegen.generate(subject, styled=True, plain=plain)

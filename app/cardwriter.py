@@ -170,11 +170,26 @@ _REGULATED = (
 
 
 def _unsupported(text: str, source: str) -> str | None:
-    """The first regulated word in `text` that the post does not use."""
+    """The first regulated word in `text` that nothing supports."""
+    from app import catalogue
+
     low, src = text.lower(), source.lower()
+    # A certification the company actually holds is reporting, not inventing,
+    # so naming one from the catalogue is allowed wherever it appears.
+    held = {c.lower() for c in catalogue.CERTIFICATIONS}
+    names_a_real_cert = any(c in low for c in held)
+    # "ISO certified" tripped on "certified" even though ISO is genuinely
+    # held. Naming a real certification brings its own vocabulary with it;
+    # what must stay blocked is the word on its own, asserting an approval
+    # nobody can point at.
+    _carried = {"certified", "certification", "approved", "compliant"}
+
     for word in _REGULATED:
-        if word in low and word not in src:
-            return word
+        if word not in low or word in src or word in held:
+            continue
+        if names_a_real_cert and word in _carried:
+            continue
+        return word
     # A figure nobody stated is an invented specification too.
     for token in re.findall(r"\d+(?:\.\d+)?\s*(?:%|percent|kg|mm|cm|days?|hours?)", low):
         if token.split()[0] not in src:
