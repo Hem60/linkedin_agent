@@ -32,14 +32,25 @@ MAX_FEATURES = 4
 
 # Layouts the writer may choose, with what each is for. Kept here rather than
 # in the prompt string so adding one is a single edit.
+#
+# Described in the brand brief's own words. It names four styles to rotate
+# between -- Product Spotlight, Material Explained, Product in Use and
+# Export-Ready Catalogue -- and choosing in that vocabulary rather than ours
+# means the rotation it asks for is the rotation the model actually makes.
 _LAYOUTS = {
-    "feature": "a product or idea with several qualities worth listing",
-    "split": "one thing explained, with a few supporting points",
-    "compare": "two things set against each other -- only when the post really "
-               "does contrast a pair",
-    "range": "the breadth of what is offered rather than one item",
-    "spotlight": "a single product, named, with two or three short claims",
-    "product": "a named product with its specification -- the most catalogue-like",
+    "spotlight": "Product Spotlight -- one product, named, with two or three "
+                 "short benefit labels. For product promotion and buyer enquiries.",
+    "product": "Product Spotlight in catalogue form -- a named product with its "
+               "specification and four benefits.",
+    "feature": "Material Explained -- how something is made, or why it behaves "
+               "as it does, with several supporting points. For credibility and "
+               "product education.",
+    "split": "Product in Use -- one thing shown in its real setting, with a few "
+             "supporting points. For caterers, kitchens and distributors.",
+    "range": "Export-Ready Catalogue -- the breadth of what is offered rather "
+             "than any one item. For importers and wholesale buyers.",
+    "compare": "Two things set against each other -- only when the post really "
+               "does contrast a pair.",
 }
 
 
@@ -106,6 +117,11 @@ take one clear message away.
 4-10 words, and must be the real subject of the post -- never a different \
 product that merely resembles it. Never a chart, a screen, a logo, or anything \
 with writing in it.
+- Do not put an exact count or dimension in photo_subject -- "six compartments", \
+"9 inch" -- unless the post states it, and prefer leaving it out even then. A \
+generated photograph will not reliably show the number you asked for, and a \
+picture that contradicts the specification printed beside it is worse than a \
+generic one.
 """
 
 
