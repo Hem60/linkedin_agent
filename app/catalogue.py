@@ -181,3 +181,33 @@ def supported_claim(text: str) -> bool:
     low = text.lower()
     named = [c for c in CERTIFICATIONS if c.lower() in low]
     return bool(named)
+
+
+# Posts that name no product at all
+#
+# "Biodegradable things", "sustainable packaging", "eco-friendly tableware" --
+# these name a category, not an item, and the matcher rightly returns nothing.
+# That left cards with no picture whenever generation was also unavailable.
+#
+# The obvious answer is a photograph of the whole range, and the one in the
+# asset library is the wrong one: it shows cups, kraft bowls and paper boxes
+# that are not in this catalogue, so a card carrying it would advertise
+# products that may not exist. Showing one real item instead says less, but
+# everything it says is true.
+_CATEGORY_WORDS = (
+    "tableware", "crockery", "disposable", "disposables", "foodservice",
+    "food service", "catering", "takeaway", "packaging", "biodegradable",
+    "compostable", "eco-friendly", "sustainable",
+)
+
+# The item shown when a post is about the range rather than a product. The
+# bagasse clamshell: the one product whose material has actually been stated.
+REPRESENTATIVE = "clamshell-9x6-bagasse"
+
+
+def representative(text: str) -> Product | None:
+    """A real product to stand for the range, when a post names no item."""
+    low = text.lower()
+    if any(word in low for word in _CATEGORY_WORDS):
+        return BY_KEY.get(REPRESENTATIVE)
+    return None

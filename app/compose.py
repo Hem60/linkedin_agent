@@ -410,7 +410,10 @@ def generate_card(post_id: int,
     # something similar, and the brand brief is explicit that a generated
     # visual must not misrepresent the real thing. It also costs nothing and
     # cannot run out of allowance.
-    catalogued = catalogue.match(f"{post.topic} {subject}")
+    hunt = f"{post.topic} {subject}"
+    # A named product first; failing that, one real item to stand for the
+    # range, so a post about "biodegradable things" is not left with a hole.
+    catalogued = catalogue.match(hunt) or catalogue.representative(hunt)
     if catalogued and not photo_subject.strip():
         hero = catalogue.photo_bytes(catalogued)
         if hero:
