@@ -94,6 +94,15 @@ PRODUCTS: tuple[Product, ...] = (
         keywords=("clamshell", "clamshells", "hinged", "6x6"),
     ),
     Product(
+        key="clamshell-9x6-single",
+        name='9" x 6" Single-Compartment Clamshell',
+        line="bagasse",
+        photo="bio-product7.jpg",
+        describes="hinged single-compartment clamshell, open, plain white "
+                  "background",
+        keywords=("clamshell", "clamshells", "hinged", "9x6", "single"),
+    ),
+    Product(
         key="groundnut-java",
         name="Java Groundnut Kernels",
         line="groundnut",
