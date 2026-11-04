@@ -76,6 +76,24 @@ PRODUCTS: tuple[Product, ...] = (
         keywords=("plate", "plates", "tableware", "bagasse", "crockery"),
     ),
     Product(
+        key="clamshell-8x8-3cp",
+        name='8" x 8" 3-Compartment Clamshell',
+        line="bagasse",
+        photo="bio-product5.jpg",
+        describes="square hinged clamshell with three compartments, open, "
+                  "plain white background",
+        keywords=("clamshell", "clamshells", "hinged", "takeaway", "8x8"),
+    ),
+    Product(
+        key="clamshell-6x6-3cp",
+        name='6" x 6" 3-Compartment Clamshell',
+        line="bagasse",
+        photo="bio-product6.jpg",
+        describes="square hinged clamshell with three compartments, deeper "
+                  "wells, open, plain white background",
+        keywords=("clamshell", "clamshells", "hinged", "6x6"),
+    ),
+    Product(
         key="groundnut-java",
         name="Java Groundnut Kernels",
         line="groundnut",
