@@ -51,8 +51,10 @@ MAX_SUBJECT_CHARS = 400
 # forbidden noun as a requested one, which is how an earlier version produced
 # the very text it was told to avoid.
 STYLE = (
-    "professional editorial photograph, clean composition, "
-    "soft natural light, muted palette"
+    "premium commercial product photography, realistic and high quality, "
+    "natural lighting with soft shadows, clear product detail, "
+    "deep forest green sage and warm cream palette, "
+    "clean minimal composition, generous empty space"
 )
 
 
@@ -64,8 +66,10 @@ class ImageGenError(Exception):
 # photograph off the page. Feathering the edge of a photograph only reads as a
 # cut-out if there is nothing in the corners to fade away.
 PLAIN = (
-    "single product centred on a plain seamless off-white studio background, "
-    "soft even shadow beneath, product photography, nothing else in frame"
+    "single hero product centred on a plain seamless warm cream background, "
+    "realistic high quality commercial product photography, natural lighting, "
+    "soft shadow beneath, clear product detail and accurate material texture, "
+    "nothing else in frame"
 )
 
 

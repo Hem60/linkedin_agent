@@ -778,10 +778,10 @@ def _render_spotlight(card: Card, photo: bytes | None) -> bytes:
 LAYOUTS.update({"range": _render_range, "spotlight": _render_spotlight})
 
 
-# The product card is square, unlike the rest. The reference is, and a square
-# is the other shape LinkedIn shows uncropped, so the layout keeps its own
-# size rather than being squeezed into the 4:5 the others use.
-PW, PH = 1080, 1080
+# Portrait 4:5, like the rest. This was square to match one reference, but the
+# brand brief asks for 1080x1350 on every image, and a feed where one card is a
+# different shape from the others is the thing a brand guide exists to stop.
+PW, PH = 1080, 1350
 PFOOTER = 104
 
 

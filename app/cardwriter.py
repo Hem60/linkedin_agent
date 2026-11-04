@@ -21,6 +21,7 @@ which arrangement holds them.
 from __future__ import annotations
 
 import logging
+import re
 
 from app import llm, postcard
 
@@ -83,14 +84,28 @@ Rules:
 sentence case, not capitals -- the template capitalises where it needs to. The \
 second line is printed in the accent colour, so put the part worth emphasising \
 there.
-- {max_features} features, each a distinct concrete claim, never a restatement \
-of the headline. For "spotlight" give three; for "compare" give none.
+- Three or four features, each a distinct point drawn from the post, never a \
+restatement of the headline. For "spotlight" give three; for "compare" give none.
+
+NEVER INVENT ANYTHING. This rule outranks the rest, because the card goes out \
+under a real company's name to buyers who may act on it. Every feature, badge, \
+subtitle and column must be supported by something the post actually says. Do \
+not state certifications, environmental claims, food-safety approvals, test \
+results, tolerances, percentages, export markets, customer names, prices, \
+capacity, or any product specification unless the post states it. Do not call \
+anything compostable, biodegradable, microwave-safe, leakproof or suitable for \
+hot food unless the post does. If the post does not give you enough for four \
+features, give two or three. A short card is correct; an invented one is not.
 - columns: exactly two, and only when layout is "compare". Otherwise an empty list.
 - badges: three to five very short reassurances, and only when layout is \
 "feature". Otherwise an empty list.
 - Choose each icon from the list for what it depicts, not at random.
+- Keep the voice plain and commercial: a buyer skim-reading on a phone should \
+take one clear message away.
 - photo_subject must be a concrete physical subject a camera could photograph, \
-4-10 words. Never a chart, a screen, a logo, or anything with writing in it.
+4-10 words, and must be the real subject of the post -- never a different \
+product that merely resembles it. Never a chart, a screen, a logo, or anything \
+with writing in it.
 """
 
 
@@ -122,6 +137,50 @@ def _features(raw: object, limit: int) -> list[postcard.Feature]:
             icon=icon if icon in ICONS else "leaf",
         ))
     return out
+
+
+# Claims a buyer could act on, and which a model will cheerfully invent. The
+# brand brief forbids all of them unless the post itself makes the claim, and
+# asking the prompt nicely does not work: told in capitals never to invent a
+# certification, it returned "Certified organic" in the same reply. So the
+# output is checked against the post rather than trusted.
+_REGULATED = (
+    "certified", "certification", "approved", "compliant", "compostable",
+    "biodegradable", "recyclable", "microwave", "leakproof", "leak proof",
+    "leak-resistant", "food-safe", "food safe", "fda", "iso", "bpa", "pfas",
+    "organic", "non-toxic", "toxin free", "guaranteed", "guarantees",
+    "tested", "lab", "patent", "award",
+)
+
+
+def _unsupported(text: str, source: str) -> str | None:
+    """The first regulated word in `text` that the post does not use."""
+    low, src = text.lower(), source.lower()
+    for word in _REGULATED:
+        if word in low and word not in src:
+            return word
+    # A figure nobody stated is an invented specification too.
+    for token in re.findall(r"\d+(?:\.\d+)?\s*(?:%|percent|kg|mm|cm|days?|hours?)", low):
+        if token.split()[0] not in src:
+            return token
+    return None
+
+
+def _vet(items: list[postcard.Feature], source: str) -> list[postcard.Feature]:
+    """Drop anything claiming something the post never said.
+
+    Dropping is the right failure: a card with two honest points is usable,
+    and one with four where a third is invented is a liability.
+    """
+    kept: list[postcard.Feature] = []
+    for item in items:
+        bad = _unsupported(f"{item.label} {item.detail}", source)
+        if bad:
+            log.info("dropped unsupported card claim %r (%r not in the post)",
+                     item.label, bad)
+            continue
+        kept.append(item)
+    return kept
 
 
 def write(post_text: str) -> tuple[postcard.Card, str]:
@@ -164,11 +223,12 @@ def write(post_text: str) -> tuple[postcard.Card, str]:
         layout=layout,
         headline=headline,
         eyebrow=_clean(data.get("eyebrow"), 26).upper(),
-        subhead=_clean(data.get("subhead"), 70),
+        subhead=("" if _unsupported(_clean(data.get("subhead"), 70), post_text)
+                 else _clean(data.get("subhead"), 70)),
         body=_clean(data.get("body"), 170),
-        features=_features(data.get("features"), MAX_FEATURES),
-        columns=columns,
-        badges=_features(data.get("badges"), 5),
+        features=_vet(_features(data.get("features"), MAX_FEATURES), post_text),
+        columns=_vet(columns, post_text),
+        badges=_vet(_features(data.get("badges"), 5), post_text),
         tagline=_clean(data.get("tagline"), 56),
     )
 
