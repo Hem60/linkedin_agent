@@ -76,6 +76,19 @@ def asset_version() -> str:
 
 templates.env.globals["asset_v"] = asset_version
 
+
+def brand_name() -> str:
+    """The deployment's own brand name, for the card form's default.
+
+    The field used to default to the user's company name alone, so on an
+    account that never set one it was blank -- and the card came out with the
+    logo and no name beside it.
+    """
+    return get_settings().brand_name
+
+
+templates.env.globals["brand_name"] = brand_name
+
 # Every form needs this; see app/csrf.py.
 from app.csrf import field as _csrf_field
 

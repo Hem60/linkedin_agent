@@ -443,7 +443,8 @@ def generate_card(post_id: int,
             columns=written.columns if written else [],
             badges=written.badges if written else [],
             tagline=written.tagline if written else "",
-            brand=(brand or user.company_name or "").strip(),
+            brand=(brand or user.company_name
+                   or get_settings().brand_name).strip(),
             contacts=[c.strip() for c in contacts.split(",") if c.strip()][:3],
         )
         prepared = uploads.prepare_upload(postcard.render(card, hero))

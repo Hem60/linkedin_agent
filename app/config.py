@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     # fallback rather than leaving the page with nothing to offer.
     pexels_api_key: str = ""
 
+    # The name printed beside the bundled logo when a user has not set a
+    # company name of their own. A card that carries the logo and no name
+    # looks unfinished, and the name is the one thing on it a deployment can
+    # be sure of -- set from the dashboard, like the models below.
+    brand_name: str = ""
     cloudflare_account_id: str = ""
     cloudflare_api_token: str = ""
     # Pinned here rather than in code so a model can be swapped from the Render
@@ -77,6 +82,19 @@ class Settings(BaseSettings):
     storage_url: str = ""
     storage_key: str = ""
     storage_bucket: str = "post-images"
+
+    # --- Telegram -----------------------------------------------------------
+    # The bot is becoming the interface. Empty turns the webhook off entirely,
+    # so the app runs unchanged without it.
+    telegram_bot_token: str = ""
+    # Telegram sends this back in X-Telegram-Bot-Api-Secret-Token on every
+    # update. Without it the webhook is an unauthenticated POST endpoint that
+    # anyone who learns the path can drive.
+    telegram_webhook_secret: str = ""
+    # How long a sign-in link stays usable. Long enough to open a browser and
+    # sign in to LinkedIn, short enough that a link left in a chat history is
+    # not a standing key to the account.
+    telegram_link_minutes: int = 15
 
     # --- Email ------------------------------------------------------------
     resend_api_key: str = ""

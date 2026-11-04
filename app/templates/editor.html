@@ -114,7 +114,7 @@
             <input type="text" name="photo_subject"
                    placeholder="picture of… (blank uses the headline)">
             <div class="cardrow">
-              <input type="text" name="brand" value="{{ user.company_name or '' }}"
+              <input type="text" name="brand" value="{{ user.company_name or brand_name() }}"
                      placeholder="brand name">
               <input type="text" name="contacts"
                      placeholder="phone, email, website — comma separated">

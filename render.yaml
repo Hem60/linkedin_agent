@@ -117,6 +117,9 @@ services:
       # better one appears, the same reason the text models are pinned.
       - key: IMAGE_MODEL
         value: "@cf/leonardo/lucid-origin"
+      - key: BRAND_NAME
+        value: "Saventra Exim"
+
       - key: IMAGE_FALLBACK_MODEL
         value: "@cf/black-forest-labs/flux-2-klein-4b"
       - key: MODEL_TIMEOUT_SECONDS
