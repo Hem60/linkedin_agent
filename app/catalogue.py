@@ -18,6 +18,12 @@ shot on a workbench with a handwritten "Bold" label in frame. The brief asks
 for premium minimal commercial imagery, and a card is not the place for
 somebody's QC note.
 
+Material is only recorded where it was stated. The bagasse clamshell is the
+one product confirmed as bagasse; the others carry "tableware" because nobody
+has said what they are made of, and the folder being called bio- is not a
+statement about material. The 9x6 comes in both, which is why the material is
+in that one's name and not in the others.
+
 Only what has been seen goes in. Entries are deliberately absent for the
 photographs nobody has identified yet: an unlabelled file is not product data,
 and guessing what a picture shows is the failure this module exists to stop.
@@ -61,7 +67,7 @@ PRODUCTS: tuple[Product, ...] = (
     Product(
         key="plate-3cp",
         name="3-Compartment Round Plate",
-        line="bagasse",
+        line="tableware",   # material not stated,
         photo="bio-product1.jpg",
         describes="two moulded fibre round plates with three compartments, "
                   "plain white background",
@@ -70,15 +76,15 @@ PRODUCTS: tuple[Product, ...] = (
     Product(
         key="plate-plain",
         name="Plain Round Plate",
-        line="bagasse",
+        line="tableware",   # material not stated,
         photo="bio-product4.jpg",
         describes="two plain moulded fibre round plates, plain white background",
-        keywords=("plate", "plates", "tableware", "bagasse", "crockery"),
+        keywords=("plate", "plates", "crockery"),
     ),
     Product(
         key="clamshell-8x8-3cp",
         name='8" x 8" 3-Compartment Clamshell',
-        line="bagasse",
+        line="tableware",   # material not stated; see module note,
         photo="bio-product5.jpg",
         describes="square hinged clamshell with three compartments, open, "
                   "plain white background",
@@ -87,7 +93,7 @@ PRODUCTS: tuple[Product, ...] = (
     Product(
         key="clamshell-6x6-3cp",
         name='6" x 6" 3-Compartment Clamshell',
-        line="bagasse",
+        line="tableware",   # material not stated; see module note,
         photo="bio-product6.jpg",
         describes="square hinged clamshell with three compartments, deeper "
                   "wells, open, plain white background",
@@ -96,11 +102,20 @@ PRODUCTS: tuple[Product, ...] = (
     Product(
         key="clamshell-9x6-single",
         name='9" x 6" Single-Compartment Clamshell',
-        line="bagasse",
+        line="tableware",   # material not stated; see module note,
         photo="bio-product7.jpg",
         describes="hinged single-compartment clamshell, open, plain white "
                   "background",
         keywords=("clamshell", "clamshells", "hinged", "9x6", "single"),
+    ),
+    Product(
+        key="clamshell-9x6-bagasse",
+        name='9" x 6" Bagasse Clamshell',
+        line="bagasse",
+        photo="bio-product8.jpg",
+        describes="rectangular hinged clamshell in natural beige moulded "
+                  "fibre, open, plain white background",
+        keywords=("bagasse", "clamshell", "clamshells", "hinged", "9x6"),
     ),
     Product(
         key="groundnut-java",
